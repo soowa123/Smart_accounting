@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:api.anthropic.com)",
+      "Bash(cd /tmp)",
+      "Bash(cp \"C:\\\\Users\\\\the_c\\\\.claude\\\\projects\\\\C--Users-the-c-Desktop-Python-ACC-Smart-accounting-V1\\\\96ae1f85-7ff5-41f5-bfb4-b63daa60f1aa\\\\tool-results\\\\webfetch-1779551285157-w7hisw.bin\" design.gz)",
+      "Bash(mkdir -p design_extract)",
+      "Bash(tar -tzf design.gz)",
+      "Bash(tar -xzf design.gz -C design_extract)",
+      "Bash(npm --version)",
+      "Bash(git --version)",
+      "PowerShell(node --version)",
+      "PowerShell(npm --version)",
+      "PowerShell($paths = @\\(\"$env:ProgramFiles\\\\nodejs\\\\node.exe\", \"${env:ProgramFiles\\(x86\\)}\\\\nodejs\\\\node.exe\", \"$env:LOCALAPPDATA\\\\Programs\\\\nodejs\\\\node.exe\", \"$env:APPDATA\\\\npm\\\\node.exe\", \"$env:LOCALAPPDATA\\\\fnm\\\\node.exe\"\\); foreach \\($p in $paths\\) { if \\(Test-Path $p\\) { \"FOUND: $p\" } }; \"--- nvm ---\"; if \\(Test-Path \"$env:APPDATA\\\\nvm\"\\) { Get-ChildItem \"$env:APPDATA\\\\nvm\" -Directory | Select-Object -ExpandProperty Name }; \"--- where node ---\"; try { \\(Get-Command node -ErrorAction Stop\\).Source } catch { \"node not on PATH\" }; \"--- volta/fnm/winget ---\"; try { \\(Get-Command winget -ErrorAction Stop\\).Source } catch { \"no winget\" })",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"User\"\\); node --version; npm --version)",
+      "PowerShell(node --version 2>&1; \"exit: $LASTEXITCODE\")",
+      "PowerShell($root = \"C:\\\\Users\\\\the_c\\\\Desktop\\\\Python\\\\ACC\\\\Smart_accounting_V1\"; $tmp = Join-Path $root \"tmpscaffold\"; Get-ChildItem -Path $tmp -Force | ForEach-Object { Move-Item -Path $_.FullName -Destination \\(Join-Path $root $_.Name\\) -Force }; Remove-Item $tmp -Recurse -Force; \"--- root contents ---\"; Get-ChildItem -Path $root -Force | Select-Object Name)",
+      "PowerShell($env:Path = \"C:\\\\Program Files\\\\nodejs;\" + $env:Path; Set-Location \"C:\\\\Users\\\\the_c\\\\Desktop\\\\Python\\\\ACC\\\\Smart_accounting_V1\"; npm install @prisma/client next-auth@beta @auth/prisma-adapter bcryptjs; npm install -D prisma tsx @types/bcryptjs)",
+      "mcp__Claude_Preview__preview_start"
+    ]
+  }
+}

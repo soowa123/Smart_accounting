@@ -1,0 +1,55 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+html, body {
+  min-height: 100%;
+  background: #EDE7F5;
+}
+
+body {
+  font-family: var(--font-jakarta), var(--font-thai), system-ui, -apple-system, sans-serif;
+  color: #1F1B2E;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:lang(th), [lang="th"] {
+  font-family: var(--font-jakarta), var(--font-thai), system-ui, sans-serif;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* App shell — centered mobile column on desktop, full-bleed on phones */
+.app-shell {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  background: #F7F4FB;
+  box-shadow: 0 0 60px -20px rgba(31, 27, 46, 0.25);
+  overflow-x: hidden;
+}
+
+/* Hide scrollbars on horizontal strips and the main scroll area */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+
+input, button, textarea { font-family: inherit; }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

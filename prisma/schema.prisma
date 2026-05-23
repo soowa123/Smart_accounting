@@ -1,0 +1,234 @@
+// Smart Accounting — data model.
+// Portable across SQLite (local dev) and Postgres (prod): no enums, no scalar lists.
+// Money stored as Float (whole baht, matching the prototype). Dates stored as
+// 'YYYY-MM-DD' / 'HH:MM' strings to mirror the prototype exactly.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  displayName  String
+  createdAt    DateTime @default(now())
+
+  accounts      Account[]
+  categories    Category[]
+  transactions  Transaction[]
+  cards         Card[]
+  loans         Loan[]
+  installments  Installment[]
+  subscriptions Subscription[]
+  budgets       Budget[]
+  goals         Goal[]
+  ious          Iou[]
+  netWorth      NetWorthSnapshot[]
+  settings      UserSettings?
+}
+
+model Account {
+  id      String @id @default(cuid())
+  userId  String
+  key     String
+  label   String
+  short   String
+  balance Float
+  color   String
+  emoji   String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}
+
+model Category {
+  id     String @id @default(cuid())
+  userId String
+  key    String
+  label  String
+  en     String
+  icon   String
+  color  String
+  kind   String // income | expense | both
+  sort   Int    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}
+
+model Transaction {
+  id          String @id @default(cuid())
+  userId      String
+  date        String // YYYY-MM-DD
+  time        String // HH:MM
+  amount      Float // negative = expense, positive = income
+  categoryKey String
+  accountKey  String
+  label       String
+  tags        String @default("[]") // JSON-encoded string[]
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+}
+
+model Card {
+  id           String @id @default(cuid())
+  userId       String
+  key          String
+  name         String
+  bank         String
+  last4        String
+  limitAmount  Float
+  used         Float
+  cycleDay     Int
+  dueDay       Int
+  dueDate      String
+  minPay       Float
+  fullPay      Float
+  gradientFrom String
+  gradientTo   String
+  sort         Int    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}
+
+model Loan {
+  id         String @id @default(cuid())
+  userId     String
+  key        String
+  label      String
+  icon       String
+  type       String
+  principal  Float
+  paid       Float
+  remaining  Float
+  monthly    Float
+  rate       Float
+  term       Int
+  paidTerms  Int
+  totalTerms Int
+  nextDue    String
+  bank       String
+  color      String
+  sort       Int    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}
+
+model Installment {
+  id      String @id @default(cuid())
+  userId  String
+  key     String
+  label   String
+  icon    String
+  shop    String
+  monthly Float
+  paid    Int
+  total   Int
+  rate    Float
+  nextDue String
+  card    String
+  color   String
+  sort    Int    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}
+
+model Subscription {
+  id      String @id @default(cuid())
+  userId  String
+  key     String
+  label   String
+  icon    String
+  amount  Float
+  cycle   String
+  nextDue String
+  color   String
+  sort    Int    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}
+
+model Budget {
+  id          String @id @default(cuid())
+  userId      String
+  categoryKey String
+  month       String // YYYY-MM
+  planned     Float
+  spent       Float
+  sort        Int    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, categoryKey, month])
+}
+
+model Goal {
+  id       String @id @default(cuid())
+  userId   String
+  key      String
+  label    String
+  icon     String
+  target   Float
+  saved    Float
+  deadline String
+  color    String
+  sort     Int    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}
+
+model Iou {
+  id     String @id @default(cuid())
+  userId String
+  name   String
+  type   String // owe | lend
+  amount Float
+  note   String
+  date   String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NetWorthSnapshot {
+  id     String @id @default(cuid())
+  userId String
+  idx    Int
+  month  String
+  value  Float
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idx])
+}
+
+model UserSettings {
+  userId           String  @id
+  showBalance      Boolean @default(true)
+  showAccounts     Boolean @default(true)
+  showQuickActions Boolean @default(true)
+  showUpcoming     Boolean @default(true)
+  showBudget       Boolean @default(true)
+  showRecent       Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
