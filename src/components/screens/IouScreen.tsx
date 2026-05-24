@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { THEME, MONO } from "@/lib/theme";
-import { fmt } from "@/lib/money";
+import { fmt, todayISO } from "@/lib/money";
 import { Card } from "@/components/ui";
 import { ScreenHeader, type NavFn } from "@/components/screen-chrome";
 import type { Iou } from "@/lib/types";
@@ -52,7 +52,7 @@ export function IouScreen({
     if (!aName.trim() || !(parseFloat(aAmount) > 0) || !onAddIou) return;
     setBusy(true);
     try {
-      await onAddIou({ name: aName.trim(), type: aType, amount: parseFloat(aAmount), note: aNote.trim(), date: new Date().toISOString().slice(0, 10) });
+      await onAddIou({ name: aName.trim(), type: aType, amount: parseFloat(aAmount), note: aNote.trim(), date: todayISO() }); // Fix H: use local date, not UTC
       setShowAdd(false);
       setAName(""); setAAmount(""); setANote("");
     } finally { setBusy(false); }

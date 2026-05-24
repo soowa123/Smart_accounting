@@ -89,7 +89,9 @@ export async function getUserData(): Promise<UserData | null> {
     })),
     // Fix #3: compute spent from actual transactions (DB value is never updated)
     budgets: (() => {
-      const monthKey = new Date().toISOString().slice(0, 7);
+      // Fix B: use local time, not toISOString() which returns UTC (wrong month before 07:00 Thai time)
+      const now = new Date();
+      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       const spentByCat: Record<string, number> = {};
       txs.forEach((t) => {
         if (t.date.startsWith(monthKey) && t.amount < 0 && !safeTags(t.tags).includes("transfer")) {

@@ -337,6 +337,8 @@ export async function recordLoanPayment(
     prisma.account.findFirst({ where: { userId, key: accountKey } }),
   ]);
   if (!loan) throw new Error("NOT_FOUND");
+  // Fix K: guard against paying a fully-paid loan (same guard recordInstPayment already has)
+  if (loan.remaining <= 0) throw new Error("ALREADY_FULLY_PAID");
   if (account && account.balance < loan.monthly) throw new Error("INSUFFICIENT_BALANCE");
 
   const interest = (loan.remaining * loan.rate) / 100 / 12;
@@ -666,7 +668,7 @@ export async function deleteIou(id: string): Promise<void> {
 export async function setBudget(categoryKey: string, planned: number): Promise<void> {
   const userId = await requireUserId();
   if (!(planned >= 0)) throw new Error("INVALID_AMOUNT");
-  const month = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const month = localISO(new Date()).slice(0, 7); // Fix A: use local time, not UTC
   const sort = await prisma.budget.count({ where: { userId } });
   await prisma.budget.upsert({
     where: { userId_categoryKey_month: { userId, categoryKey, month } },
@@ -677,7 +679,7 @@ export async function setBudget(categoryKey: string, planned: number): Promise<v
 
 export async function deleteBudget(categoryKey: string): Promise<void> {
   const userId = await requireUserId();
-  const month = new Date().toISOString().slice(0, 7);
+  const month = localISO(new Date()).slice(0, 7); // Fix A: use local time, not UTC
   await prisma.budget.deleteMany({ where: { userId, categoryKey, month } });
 }
 

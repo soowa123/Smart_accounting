@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { THEME, MONO } from "@/lib/theme";
-import { fmt, fmtK, thDayMonth } from "@/lib/money";
+import { fmt, fmtK, thDayMonth, todayISO } from "@/lib/money";
 import { Card, Segmented, Pill, Ring, ProgressBar, SoftButton } from "@/components/ui";
 import { ScreenHeader, type NavFn } from "@/components/screen-chrome";
 import type { Card as CardT, Loan, Installment, Subscription, Account } from "@/lib/types";
@@ -473,7 +473,7 @@ function AddCardModal({
         limitAmount: limitNum, used: usedNum,
         cycleDay: parseInt(cycleDay) || 1,
         dueDay: parseInt(dueDay) || 25,
-        dueDate: dueDate || new Date().toISOString().slice(0, 10),
+        dueDate: dueDate || todayISO(), // Fix D: use local date, not UTC
         minPay, fullPay,
         gradientFrom: gradient[0], gradientTo: gradient[1],
       });
@@ -589,7 +589,7 @@ function CardsView({
                     <div style={{ fontSize: 18, fontWeight: 800, marginTop: 2 }}>{c.name}</div>
                   </div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <div style={{ padding: "4px 8px", background: "rgba(255,255,255,0.22)", borderRadius: 6, fontSize: 10, fontWeight: 700, letterSpacing: 0.5 }}>VISA</div>
+                    <div style={{ padding: "4px 8px", background: "rgba(255,255,255,0.22)", borderRadius: 6, fontSize: 10, fontWeight: 700, letterSpacing: 0.5 }}>CREDIT</div>
                     <button
                       onClick={() => handleDelete(c)}
                       style={{ background: "rgba(255,255,255,0.2)", border: "none", borderRadius: 8, width: 28, height: 28, cursor: "pointer", color: "#fff", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}
@@ -813,7 +813,7 @@ function AddLoanModal({
         term: totalTermsNum,
         paidTerms: paidTermsNum,
         totalTerms: totalTermsNum,
-        nextDue: nextDue || new Date().toISOString().slice(0, 10),
+        nextDue: nextDue || todayISO(), // Fix E: use local date, not UTC
         bank, color,
       });
       onClose();
@@ -1050,7 +1050,7 @@ function AddInstallmentModal({
         paid: parseInt(paid) || 0,
         total: parseInt(total) || 1,
         rate: parseFloat(rate) || 0,
-        nextDue: nextDue || new Date().toISOString().slice(0, 10),
+        nextDue: nextDue || todayISO(), // Fix F: use local date, not UTC
         card, color,
       });
       onClose();
@@ -1127,7 +1127,7 @@ function InstallmentsView({
               <div style={{ fontSize: 18, fontWeight: 800, color: THEME.text, fontFamily: MONO }}>{fmt(totalMonthly)} / เดือน</div>
               <div style={{ fontSize: 11, color: THEME.textMuted, marginTop: 1 }}>เหลืออีก {fmt(totalRemaining)}</div>
             </div>
-            <Pill color={THEME.income}>0% ทั้งหมด</Pill>
+            {installments.every((i) => i.rate === 0) && <Pill color={THEME.income}>0% ทั้งหมด</Pill>}
           </div>
         </Card>
       </div>
@@ -1208,7 +1208,7 @@ function AddSubscriptionModal({
       await onAdd({
         label, icon,
         amount: parseFloat(amount) || 0,
-        cycle, nextDue: nextDue || new Date().toISOString().slice(0, 10),
+        cycle, nextDue: nextDue || todayISO(), // Fix G: use local date, not UTC
         color,
       });
       onClose();

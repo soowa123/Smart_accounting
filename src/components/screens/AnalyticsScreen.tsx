@@ -56,7 +56,10 @@ export function AnalyticsScreen({
                 <div style={{ fontSize: 11, color: THEME.textSec, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Net Worth</div>
                 <div style={{ fontSize: 24, fontWeight: 800, color: THEME.text, marginTop: 2, fontFamily: MONO }}>{fmt(lastNet)}</div>
               </div>
-              <Pill color={THEME.income} style={{ fontSize: 12, padding: "5px 10px" }}>▲ +{growth.toFixed(1)}% YoY</Pill>
+              {/* Fix L: show correct arrow and sign when growth is negative */}
+              <Pill color={growth >= 0 ? THEME.income : THEME.expense} style={{ fontSize: 12, padding: "5px 10px" }}>
+                {growth >= 0 ? "▲" : "▼"} {growth >= 0 ? "+" : ""}{growth.toFixed(1)}% YoY
+              </Pill>
             </div>
             <div style={{ marginTop: 10 }}>
               <LineChart points={networthPoints} color={THEME.income} height={90} />

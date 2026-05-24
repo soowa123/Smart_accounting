@@ -152,9 +152,15 @@ export function AppShell({ data }: { data: UserData }) {
 
   // ── Widgets ─────────────────────────────────────────────────────────────────
 
+  // Fix C: add try/catch + rollback so a server failure doesn't leave the toggle stuck
   const onToggleWidget = async (key: keyof Widgets, value: boolean) => {
     setWidgets((prev) => ({ ...prev, [key]: value }));
-    await setWidget(key, value);
+    try {
+      await setWidget(key, value);
+    } catch (e) {
+      setWidgets((prev) => ({ ...prev, [key]: !value })); // rollback
+      handleError(e);
+    }
   };
 
   // ── Goals ────────────────────────────────────────────────────────────────────
