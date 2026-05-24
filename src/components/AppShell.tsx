@@ -2,13 +2,19 @@
 
 import { useMemo, useState } from "react";
 import type { UserData } from "@/lib/data";
-import type { Category, Tx, Goal, Widgets, Account } from "@/lib/types";
+import type { Category, Tx, Goal, Widgets, Account, Card as CardT, Loan, Installment, Subscription } from "@/lib/types";
 import { buildUpcoming, buildMonthly } from "@/lib/derive";
 import { todayISO, currentMonthKey } from "@/lib/money";
 import { TabBar } from "@/components/TabBar";
 import { AddModal, type TxDraft } from "@/components/AddModal";
 import type { NavFn } from "@/components/screen-chrome";
-import { addTransaction, deleteTransaction, setWidget, depositGoal, addAccount, transferBetweenAccounts, updateAccount, logout } from "@/app/(app)/actions";
+import {
+  addTransaction, deleteTransaction, setWidget, depositGoal, addAccount, transferBetweenAccounts, updateAccount, logout,
+  addCard, deleteCard, payCard,
+  addLoan, deleteLoan, recordLoanPayment,
+  addInstallment, deleteInstallment, recordInstPayment,
+  addSubscription, deleteSubscription,
+} from "@/app/(app)/actions";
 
 import { HomeScreen } from "@/components/screens/HomeScreen";
 import { TxScreen } from "@/components/screens/TxScreen";
@@ -35,6 +41,10 @@ export function AppShell({ data }: { data: UserData }) {
   const [goals, setGoals] = useState<Goal[]>(data.goals);
   const [widgets, setWidgets] = useState<Widgets>(data.widgets);
   const [accounts, setAccounts] = useState<Account[]>(data.accounts);
+  const [cards, setCards] = useState<CardT[]>(data.cards);
+  const [loans, setLoans] = useState<Loan[]>(data.loans);
+  const [installments, setInstallments] = useState<Installment[]>(data.installments);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>(data.subscriptions);
 
   const catMap = useMemo(() => {
     const m: Record<string, Category> = {};
@@ -53,8 +63,8 @@ export function AppShell({ data }: { data: UserData }) {
   }, [accounts]);
 
   const upcoming = useMemo(
-    () => buildUpcoming(data.cards, data.loans, data.installments, data.subscriptions, todayISO()),
-    [data.cards, data.loans, data.installments, data.subscriptions],
+    () => buildUpcoming(cards, loans, installments, subscriptions, todayISO()),
+    [cards, loans, installments, subscriptions],
   );
   const monthly = useMemo(() => buildMonthly(txs), [txs]);
   const monthKey = currentMonthKey();
@@ -112,6 +122,74 @@ export function AppShell({ data }: { data: UserData }) {
     setAccounts((prev) => prev.map((a) => (a.key === key ? { ...a, ...data } : a)));
   };
 
+  const onPayCard = async (key: string, payFull: boolean, accountKey: string) => {
+    const { card, tx } = await payCard(key, payFull, accountKey);
+    setCards((prev) => prev.map((c) => (c.key === key ? card : c)));
+    setTxs((prev) => [tx, ...prev]);
+    setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
+  };
+
+  const onAddCard = async (draft: Omit<CardT, "key">) => {
+    const created = await addCard(draft);
+    setCards((prev) => [...prev, created]);
+  };
+
+  const onDeleteCard = async (key: string) => {
+    await deleteCard(key);
+    setCards((prev) => prev.filter((c) => c.key !== key));
+  };
+
+  const onRecordLoanPayment = async (key: string, accountKey: string) => {
+    const { loan, tx } = await recordLoanPayment(key, accountKey);
+    setLoans((prev) => prev.map((l) => (l.key === key ? loan : l)));
+    setTxs((prev) => [tx, ...prev]);
+    setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
+  };
+
+  const onAddLoan = async (draft: Omit<Loan, "key">) => {
+    const created = await addLoan(draft);
+    setLoans((prev) => [...prev, created]);
+  };
+
+  const onDeleteLoan = async (key: string) => {
+    await deleteLoan(key);
+    setLoans((prev) => prev.filter((l) => l.key !== key));
+  };
+
+  const onRecordInstPayment = async (key: string, accountKey: string) => {
+    const { inst, tx } = await recordInstPayment(key, accountKey);
+    setInstallments((prev) => prev.map((i) => (i.key === key ? inst : i)));
+    setTxs((prev) => [tx, ...prev]);
+    setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
+  };
+
+  const onAddInstallment = async (draft: Omit<Installment, "key">) => {
+    const created = await addInstallment(draft);
+    setInstallments((prev) => [...prev, created]);
+  };
+
+  const onDeleteInstallment = async (key: string) => {
+    await deleteInstallment(key);
+    setInstallments((prev) => prev.filter((i) => i.key !== key));
+  };
+
+  const onAddSubscription = async (draft: Omit<Subscription, "key">) => {
+    const created = await addSubscription(draft);
+    setSubscriptions((prev) => [...prev, created]);
+  };
+
+  const onDeleteSubscription = async (key: string) => {
+    await deleteSubscription(key);
+    setSubscriptions((prev) => prev.filter((s) => s.key !== key));
+  };
+
+  const moneyHandlers = {
+    onPayCard, onAddCard, onDeleteCard,
+    onRecordLoanPayment, onAddLoan, onDeleteLoan,
+    onRecordInstPayment, onAddInstallment, onDeleteInstallment,
+    onAddSubscription, onDeleteSubscription,
+  };
+
   let screen: React.ReactNode;
   switch (tab) {
     case "home":
@@ -137,11 +215,13 @@ export function AppShell({ data }: { data: UserData }) {
       screen = (
         <MoneyScreen
           initialTab={moneyTab}
-          cards={data.cards}
-          loans={data.loans}
-          installments={data.installments}
-          subscriptions={data.subscriptions}
+          cards={cards}
+          loans={loans}
+          installments={installments}
+          subscriptions={subscriptions}
+          accounts={accounts}
           nav={nav}
+          handlers={moneyHandlers}
         />
       );
       break;
