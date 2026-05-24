@@ -11,9 +11,11 @@ type MoneyTab = "cards" | "loans" | "inst" | "subs";
 
 type MoneyHandlers = {
   onPayCard: (key: string, payFull: boolean, accountKey: string) => Promise<void>;
+  onPayCardAmount: (key: string, amount: number, accountKey: string) => Promise<void>;
   onAddCard: (draft: Omit<CardT, "key">) => Promise<void>;
   onDeleteCard: (key: string) => Promise<void>;
   onRecordLoanPayment: (key: string, accountKey: string) => Promise<void>;
+  onPayLoanAmount: (key: string, amount: number, accountKey: string) => Promise<void>;
   onAddLoan: (draft: Omit<Loan, "key">) => Promise<void>;
   onDeleteLoan: (key: string) => Promise<void>;
   onRecordInstPayment: (key: string, accountKey: string) => Promise<void>;
@@ -21,6 +23,7 @@ type MoneyHandlers = {
   onDeleteInstallment: (key: string) => Promise<void>;
   onAddSubscription: (draft: Omit<Subscription, "key">) => Promise<void>;
   onDeleteSubscription: (key: string) => Promise<void>;
+  onUpdateSubscription: (key: string, data: Omit<Subscription, "key">) => Promise<void>;
 };
 
 const addBtnStyle: React.CSSProperties = {
@@ -220,6 +223,218 @@ function PayCardModal({
 }
 
 // ────────────────────────────────────────────────────────────────────────────────
+// PayCardCustom Modal — "จ่ายตามใจ"
+// ────────────────────────────────────────────────────────────────────────────────
+function PayCardCustomModal({
+  card,
+  accounts,
+  onClose,
+  onPay,
+}: {
+  card: CardT;
+  accounts: Account[];
+  onClose: () => void;
+  onPay: (amount: number, accountKey: string) => Promise<void>;
+}) {
+  const [accountKey, setAccountKey] = useState(accounts[0]?.key ?? "");
+  const [amountStr, setAmountStr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const amount = parseFloat(amountStr) || 0;
+  const valid = accountKey && amount > 0 && amount <= card.fullPay;
+
+  const handlePay = async () => {
+    if (!valid) return;
+    setBusy(true);
+    try {
+      await onPay(amount, accountKey);
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text, marginBottom: 4 }}>
+          💡 จ่ายตามใจ — {card.name}
+        </div>
+        <div style={{ fontSize: 12, color: THEME.textSec, marginBottom: 18 }}>
+          ยอดเต็ม ฿{fmt(card.fullPay)} · ขั้นต่ำ ฿{fmt(card.minPay)}
+        </div>
+        <Field label="จำนวนที่ต้องการจ่าย (฿)">
+          <input
+            style={inputStyle}
+            type="number"
+            placeholder={`${card.minPay}–${card.fullPay}`}
+            value={amountStr}
+            onChange={(e) => setAmountStr(e.target.value)}
+            autoFocus
+          />
+        </Field>
+        {amount > card.fullPay && (
+          <div style={{ fontSize: 11, color: THEME.expense, marginBottom: 10, fontWeight: 600 }}>
+            ⚠️ ไม่สามารถจ่ายเกินยอดเต็ม ฿{fmt(card.fullPay)}
+          </div>
+        )}
+        <Field label="ตัดจากบัญชี">
+          <AccountSelect accounts={accounts} value={accountKey} onChange={setAccountKey} />
+        </Field>
+        <button
+          disabled={!valid || busy}
+          onClick={handlePay}
+          style={{
+            width: "100%", padding: "14px", borderRadius: 14, border: "none",
+            background: THEME.primary, color: "#fff", fontWeight: 800, fontSize: 15, cursor: "pointer",
+            opacity: !valid || busy ? 0.5 : 1,
+          }}
+        >
+          {busy ? "กำลังบันทึก..." : `ยืนยันจ่าย ฿${fmt(amount)}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
+// PayLoanCustom Modal — "จ่ายตามใจ"
+// ────────────────────────────────────────────────────────────────────────────────
+function PayLoanCustomModal({
+  loan,
+  accounts,
+  onClose,
+  onPay,
+}: {
+  loan: Loan;
+  accounts: Account[];
+  onClose: () => void;
+  onPay: (amount: number, accountKey: string) => Promise<void>;
+}) {
+  const [accountKey, setAccountKey] = useState(accounts[0]?.key ?? "");
+  const [amountStr, setAmountStr] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const amount = parseFloat(amountStr) || 0;
+  const valid = accountKey && amount > 0 && amount <= loan.remaining;
+
+  const handlePay = async () => {
+    if (!valid) return;
+    setBusy(true);
+    try {
+      await onPay(amount, accountKey);
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text, marginBottom: 4 }}>
+          💡 จ่ายตามใจ — {loan.label}
+        </div>
+        <div style={{ fontSize: 12, color: THEME.textSec, marginBottom: 18 }}>
+          ค่างวดปกติ ฿{fmt(loan.monthly)} · ยอดคงเหลือ ฿{fmt(loan.remaining)}
+        </div>
+        <Field label="จำนวนที่ต้องการจ่าย (฿)">
+          <input
+            style={inputStyle}
+            type="number"
+            placeholder={`${loan.monthly}+`}
+            value={amountStr}
+            onChange={(e) => setAmountStr(e.target.value)}
+            autoFocus
+          />
+        </Field>
+        {amount > loan.remaining && (
+          <div style={{ fontSize: 11, color: THEME.expense, marginBottom: 10, fontWeight: 600 }}>
+            ⚠️ ไม่สามารถจ่ายเกินยอดคงเหลือ ฿{fmt(loan.remaining)}
+          </div>
+        )}
+        <Field label="ตัดจากบัญชี">
+          <AccountSelect accounts={accounts} value={accountKey} onChange={setAccountKey} />
+        </Field>
+        <button
+          disabled={!valid || busy}
+          onClick={handlePay}
+          style={{
+            width: "100%", padding: "14px", borderRadius: 14, border: "none",
+            background: THEME.primary, color: "#fff", fontWeight: 800, fontSize: 15, cursor: "pointer",
+            opacity: !valid || busy ? 0.5 : 1,
+          }}
+        >
+          {busy ? "กำลังบันทึก..." : `ยืนยันจ่าย ฿${fmt(amount)}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
+// EditSubscription Modal
+// ────────────────────────────────────────────────────────────────────────────────
+function EditSubscriptionModal({
+  sub,
+  onClose,
+  onSave,
+}: {
+  sub: Subscription;
+  onClose: () => void;
+  onSave: (data: Omit<Subscription, "key">) => Promise<void>;
+}) {
+  const [label, setLabel] = useState(sub.label);
+  const [icon, setIcon] = useState(sub.icon);
+  const [amount, setAmount] = useState(String(sub.amount));
+  const [cycle, setCycle] = useState(sub.cycle);
+  const [nextDue, setNextDue] = useState(sub.nextDue);
+  const [color, setColor] = useState(sub.color);
+  const [busy, setBusy] = useState(false);
+
+  const handleSave = async () => {
+    if (!label || !amount) return;
+    setBusy(true);
+    try {
+      await onSave({ label, icon, amount: parseFloat(amount) || 0, cycle, nextDue, color });
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text, marginBottom: 18 }}>✏️ แก้ไข Subscription</div>
+        <Field label="ชื่อ"><input style={inputStyle} value={label} onChange={(e) => setLabel(e.target.value)} /></Field>
+        <Field label="ไอคอน (Emoji)"><input style={inputStyle} value={icon} onChange={(e) => setIcon(e.target.value)} /></Field>
+        <Field label="ราคา (บาท)"><input style={inputStyle} type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
+        <Field label="รอบการชำระ">
+          <select style={inputStyle} value={cycle} onChange={(e) => setCycle(e.target.value)}>
+            <option value="monthly">รายเดือน</option>
+            <option value="yearly">รายปี</option>
+          </select>
+        </Field>
+        <Field label="วันครบกำหนดถัดไป"><input style={inputStyle} type="date" value={nextDue} onChange={(e) => setNextDue(e.target.value)} /></Field>
+        <Field label="สี"><ColorPresetPicker value={color} onChange={setColor} presets={SINGLE_COLORS} /></Field>
+        <button
+          disabled={!label || !amount || busy}
+          onClick={handleSave}
+          style={{
+            marginTop: 4, width: "100%", padding: "14px", borderRadius: 14, border: "none",
+            background: THEME.primary, color: "#fff", fontWeight: 800, fontSize: 15, cursor: "pointer",
+            opacity: !label || !amount || busy ? 0.5 : 1,
+          }}
+        >
+          {busy ? "กำลังบันทึก..." : "บันทึก"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
 // AddCard Modal
 // ────────────────────────────────────────────────────────────────────────────────
 function AddCardModal({
@@ -313,6 +528,7 @@ function CardsView({
   handlers: MoneyHandlers;
 }) {
   const [payModal, setPayModal] = useState<{ card: CardT; payFull: boolean } | null>(null);
+  const [customPayCard, setCustomPayCard] = useState<CardT | null>(null);
   const [showAdd, setShowAdd] = useState(false);
 
   const totalLimit = cards.reduce((s, c) => s + c.limitAmount, 0) || 1;
@@ -399,12 +615,15 @@ function CardsView({
                   </div>
                   <ProgressBar value={c.used} max={c.limitAmount} color={c.gradientFrom} height={6} />
                 </div>
-                <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+                <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
                   <SoftButton color={c.gradientFrom} full style={{ flex: 1 }} onClick={() => setPayModal({ card: c, payFull: true })}>
                     จ่ายเต็มจำนวน
                   </SoftButton>
                   <SoftButton color={THEME.textSec} style={{ background: "rgba(31,27,46,0.06)" }} onClick={() => setPayModal({ card: c, payFull: false })}>
-                    จ่ายขั้นต่ำ {fmt(c.minPay)}
+                    ขั้นต่ำ {fmt(c.minPay)}
+                  </SoftButton>
+                  <SoftButton color={THEME.purple} style={{ background: THEME.purpleSoft }} onClick={() => setCustomPayCard(c)}>
+                    💡 จ่ายตามใจ
                   </SoftButton>
                 </div>
                 {c.minPay > 0 && c.used > 0 && (
@@ -426,6 +645,14 @@ function CardsView({
           accounts={accounts}
           onClose={() => setPayModal(null)}
           onPay={(accountKey) => handlers.onPayCard(payModal.card.key, payModal.payFull, accountKey)}
+        />
+      )}
+      {customPayCard && (
+        <PayCardCustomModal
+          card={customPayCard}
+          accounts={accounts}
+          onClose={() => setCustomPayCard(null)}
+          onPay={(amount, accountKey) => handlers.onPayCardAmount(customPayCard.key, amount, accountKey)}
         />
       )}
       {showAdd && (
@@ -646,6 +873,7 @@ function LoansView({
 }) {
   const [amortLoan, setAmortLoan] = useState<Loan | null>(null);
   const [payLoan, setPayLoan] = useState<Loan | null>(null);
+  const [customPayLoan, setCustomPayLoan] = useState<Loan | null>(null);
   const [showAdd, setShowAdd] = useState(false);
 
   const totalRemaining = loans.reduce((s, l) => s + l.remaining, 0);
@@ -702,9 +930,10 @@ function LoansView({
                 <div style={{ fontSize: 10, color: l.color, fontWeight: 700, letterSpacing: 0.3 }}>งวดถัดไป</div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: THEME.text, marginTop: 1 }}>{thDayMonth(l.nextDue)} · {fmt(l.monthly)}</div>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <SoftButton color={l.color} style={{ padding: "8px 14px" }} onClick={() => setAmortLoan(l)}>ดูตาราง</SoftButton>
                 <SoftButton color={THEME.primary} style={{ padding: "8px 14px" }} onClick={() => setPayLoan(l)}>บันทึกจ่ายงวด</SoftButton>
+                <SoftButton color={THEME.purple} style={{ padding: "8px 14px", background: THEME.purpleSoft }} onClick={() => setCustomPayLoan(l)}>💡 จ่ายตามใจ</SoftButton>
               </div>
             </div>
           </Card>
@@ -719,6 +948,14 @@ function LoansView({
           accounts={accounts}
           onClose={() => setPayLoan(null)}
           onPay={(accountKey) => handlers.onRecordLoanPayment(payLoan.key, accountKey)}
+        />
+      )}
+      {customPayLoan && (
+        <PayLoanCustomModal
+          loan={customPayLoan}
+          accounts={accounts}
+          onClose={() => setCustomPayLoan(null)}
+          onPay={(amount, accountKey) => handlers.onPayLoanAmount(customPayLoan.key, amount, accountKey)}
         />
       )}
       {showAdd && <AddLoanModal onClose={() => setShowAdd(false)} onAdd={handlers.onAddLoan} />}
@@ -1023,6 +1260,7 @@ function SubsView({
   handlers: MoneyHandlers;
 }) {
   const [showAdd, setShowAdd] = useState(false);
+  const [editSub, setEditSub] = useState<Subscription | null>(null);
   const total = subs.reduce((s, x) => s + x.amount, 0);
 
   const handleDelete = (s: Subscription) => {
@@ -1061,10 +1299,16 @@ function SubsView({
               <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                 <div style={{ fontSize: 15, fontWeight: 800, color: THEME.text, fontFamily: MONO }}>{fmt(s.amount)}</div>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, color: THEME.income, fontWeight: 700 }}>● Active</div>
-                <button
-                  onClick={() => handleDelete(s)}
-                  style={{ background: THEME.expenseSoft, border: "none", borderRadius: 8, width: 26, height: 26, cursor: "pointer", color: THEME.expense, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}
-                >🗑</button>
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button
+                    onClick={() => setEditSub(s)}
+                    style={{ background: THEME.purpleSoft, border: "none", borderRadius: 8, width: 26, height: 26, cursor: "pointer", color: THEME.purple, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}
+                  >✏️</button>
+                  <button
+                    onClick={() => handleDelete(s)}
+                    style={{ background: THEME.expenseSoft, border: "none", borderRadius: 8, width: 26, height: 26, cursor: "pointer", color: THEME.expense, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}
+                  >🗑</button>
+                </div>
               </div>
             </div>
           </Card>
@@ -1073,6 +1317,13 @@ function SubsView({
       </div>
 
       {showAdd && <AddSubscriptionModal onClose={() => setShowAdd(false)} onAdd={handlers.onAddSubscription} />}
+      {editSub && (
+        <EditSubscriptionModal
+          sub={editSub}
+          onClose={() => setEditSub(null)}
+          onSave={(data) => handlers.onUpdateSubscription(editSub.key, data)}
+        />
+      )}
     </div>
   );
 }

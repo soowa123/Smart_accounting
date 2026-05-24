@@ -9,7 +9,13 @@ import { Icon } from "@/components/icons";
 import type { Account, Category, Tx } from "@/lib/types";
 
 const PRESET_COLORS = ["#16A34A", "#7C3AED", "#F59E0B", "#3B82F6", "#EC4899", "#EF4444", "#0EA5E9", "#F97316"];
-const PRESET_EMOJIS = ["🏦", "💵", "💳", "🟢", "🟣", "🟠", "🔵", "🟡", "🔴", "💰", "🏧", "✨"];
+const PRESET_EMOJIS = [
+  "🏦", "💵", "💳", "💰", "🏧", "💴", "💶", "💷",
+  "🟢", "🟣", "🟠", "🔵", "🟡", "🔴", "🟤", "⚫",
+  "✨", "🌟", "💎", "🎯", "🏆", "🔑", "⭐", "🌈",
+  "🏠", "🚗", "✈️", "🎓", "💼", "🛍️", "📱", "🎮",
+  "🌸", "🍀", "🦋", "🌺", "🎪", "🍁", "🐼", "🦊",
+];
 
 const overlayStyle: React.CSSProperties = {
   position: "fixed", inset: 0, zIndex: 50,
@@ -141,9 +147,25 @@ export function AccountsScreen({
     return (
       <div style={{ paddingBottom: 100 }}>
         {/* Header */}
-        <div style={{ padding: "60px 20px 0", display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => setDetailKey(null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-            <Icon name="chevronLeft" size={22} color={THEME.text} />
+        <div style={{ padding: "56px 20px 0", display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            onClick={() => setDetailKey(null)}
+            style={{
+              background: THEME.surfaceAlt,
+              border: "none",
+              cursor: "pointer",
+              padding: "8px 14px",
+              borderRadius: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              color: THEME.text,
+              fontSize: 13,
+              fontWeight: 700,
+            }}
+          >
+            <Icon name="chevronLeft" size={16} color={THEME.text} />
+            ย้อนกลับ
           </button>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, color: THEME.textSec, fontWeight: 600, textTransform: "uppercase" }}>บัญชี</div>

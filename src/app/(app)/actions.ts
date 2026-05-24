@@ -371,6 +371,111 @@ export async function updateAccount(
   await prisma.account.updateMany({ where: { userId, key }, data });
 }
 
+export async function payCardAmount(
+  key: string,
+  amount: number,
+  accountKey: string,
+): Promise<{ card: Card; tx: Tx }> {
+  const userId = await requireUserId();
+  if (!(amount > 0)) throw new Error("INVALID_AMOUNT");
+  const card = await prisma.card.findFirst({ where: { userId, key } });
+  if (!card) throw new Error("NOT_FOUND");
+
+  const payAmount = Math.min(amount, card.fullPay);
+  const newUsed = Math.max(0, card.used - payAmount);
+  const newFullPay = Math.max(0, card.fullPay - payAmount);
+  const newMinPay = newFullPay <= 0 ? 0 : Math.max(500, Math.round(newFullPay * 0.05));
+  const newDueDate = nextDueFromDay(card.dueDay);
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10);
+  const time = now.toTimeString().slice(0, 5);
+
+  const [updatedCard, createdTx] = await prisma.$transaction([
+    prisma.card.update({
+      where: { id: card.id },
+      data: { used: newUsed, fullPay: newFullPay, minPay: newMinPay, dueDate: newDueDate },
+    }),
+    prisma.transaction.create({
+      data: {
+        userId, date, time, amount: -payAmount, categoryKey: "bills",
+        accountKey, label: `ชำระบัตร ${card.name}`, tags: '["card-payment"]',
+      },
+    }),
+  ]);
+
+  return {
+    card: {
+      key: updatedCard.key, name: updatedCard.name, bank: updatedCard.bank, last4: updatedCard.last4,
+      limitAmount: updatedCard.limitAmount, used: updatedCard.used, cycleDay: updatedCard.cycleDay,
+      dueDay: updatedCard.dueDay, dueDate: updatedCard.dueDate, minPay: updatedCard.minPay,
+      fullPay: updatedCard.fullPay, gradientFrom: updatedCard.gradientFrom, gradientTo: updatedCard.gradientTo,
+    },
+    tx: {
+      id: createdTx.id, date: createdTx.date, time: createdTx.time, amount: createdTx.amount,
+      categoryKey: createdTx.categoryKey, accountKey: createdTx.accountKey, label: createdTx.label,
+      tags: ["card-payment"],
+    },
+  };
+}
+
+export async function payLoanAmount(
+  key: string,
+  amount: number,
+  accountKey: string,
+): Promise<{ loan: Loan; tx: Tx }> {
+  const userId = await requireUserId();
+  if (!(amount > 0)) throw new Error("INVALID_AMOUNT");
+  const loan = await prisma.loan.findFirst({ where: { userId, key } });
+  if (!loan) throw new Error("NOT_FOUND");
+
+  const payAmount = Math.min(amount, loan.remaining);
+  const interest = (loan.remaining * loan.rate) / 100 / 12;
+  const principalPaid = Math.max(0, payAmount - interest);
+  const newRemaining = Math.max(0, loan.remaining - principalPaid);
+  const newPaid = loan.paid + payAmount;
+  const newPaidTerms = loan.paidTerms + 1;
+  const newNextDue = advanceMonth(loan.nextDue);
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10);
+  const time = now.toTimeString().slice(0, 5);
+
+  const [updatedLoan, createdTx] = await prisma.$transaction([
+    prisma.loan.update({
+      where: { id: loan.id },
+      data: { remaining: newRemaining, paid: newPaid, paidTerms: newPaidTerms, nextDue: newNextDue },
+    }),
+    prisma.transaction.create({
+      data: {
+        userId, date, time, amount: -payAmount, categoryKey: "bills",
+        accountKey, label: `ผ่อน ${loan.label} งวด ${loan.paidTerms + 1}`, tags: '["loan-payment"]',
+      },
+    }),
+  ]);
+
+  return {
+    loan: {
+      key: updatedLoan.key, label: updatedLoan.label, icon: updatedLoan.icon, type: updatedLoan.type,
+      principal: updatedLoan.principal, paid: updatedLoan.paid, remaining: updatedLoan.remaining,
+      monthly: updatedLoan.monthly, rate: updatedLoan.rate, term: updatedLoan.term,
+      paidTerms: updatedLoan.paidTerms, totalTerms: updatedLoan.totalTerms, nextDue: updatedLoan.nextDue,
+      bank: updatedLoan.bank, color: updatedLoan.color,
+    },
+    tx: {
+      id: createdTx.id, date: createdTx.date, time: createdTx.time, amount: createdTx.amount,
+      categoryKey: createdTx.categoryKey, accountKey: createdTx.accountKey, label: createdTx.label,
+      tags: ["loan-payment"],
+    },
+  };
+}
+
+export async function updateSubscription(
+  key: string,
+  data: { label: string; icon: string; amount: number; cycle: string; nextDue: string; color: string },
+): Promise<void> {
+  const userId = await requireUserId();
+  await prisma.subscription.updateMany({ where: { userId, key }, data });
+}
+
 export async function logout(): Promise<void> {
   await signOut({ redirectTo: "/login" });
 }

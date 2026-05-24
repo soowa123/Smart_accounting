@@ -10,10 +10,10 @@ import { AddModal, type TxDraft } from "@/components/AddModal";
 import type { NavFn } from "@/components/screen-chrome";
 import {
   addTransaction, deleteTransaction, setWidget, depositGoal, addAccount, transferBetweenAccounts, updateAccount, logout,
-  addCard, deleteCard, payCard,
-  addLoan, deleteLoan, recordLoanPayment,
+  addCard, deleteCard, payCard, payCardAmount,
+  addLoan, deleteLoan, recordLoanPayment, payLoanAmount,
   addInstallment, deleteInstallment, recordInstPayment,
-  addSubscription, deleteSubscription,
+  addSubscription, deleteSubscription, updateSubscription,
 } from "@/app/(app)/actions";
 
 import { HomeScreen } from "@/components/screens/HomeScreen";
@@ -135,6 +135,13 @@ export function AppShell({ data }: { data: UserData }) {
     setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
   };
 
+  const onPayCardAmount = async (key: string, amount: number, accountKey: string) => {
+    const { card, tx } = await payCardAmount(key, amount, accountKey);
+    setCards((prev) => prev.map((c) => (c.key === key ? card : c)));
+    setTxs((prev) => [tx, ...prev]);
+    setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
+  };
+
   const onAddCard = async (draft: Omit<CardT, "key">) => {
     const created = await addCard(draft);
     setCards((prev) => [...prev, created]);
@@ -147,6 +154,13 @@ export function AppShell({ data }: { data: UserData }) {
 
   const onRecordLoanPayment = async (key: string, accountKey: string) => {
     const { loan, tx } = await recordLoanPayment(key, accountKey);
+    setLoans((prev) => prev.map((l) => (l.key === key ? loan : l)));
+    setTxs((prev) => [tx, ...prev]);
+    setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
+  };
+
+  const onPayLoanAmount = async (key: string, amount: number, accountKey: string) => {
+    const { loan, tx } = await payLoanAmount(key, amount, accountKey);
     setLoans((prev) => prev.map((l) => (l.key === key ? loan : l)));
     setTxs((prev) => [tx, ...prev]);
     setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
@@ -189,11 +203,16 @@ export function AppShell({ data }: { data: UserData }) {
     setSubscriptions((prev) => prev.filter((s) => s.key !== key));
   };
 
+  const onUpdateSubscription = async (key: string, data: Omit<import("@/lib/types").Subscription, "key">) => {
+    await updateSubscription(key, data);
+    setSubscriptions((prev) => prev.map((s) => (s.key === key ? { ...s, ...data } : s)));
+  };
+
   const moneyHandlers = {
-    onPayCard, onAddCard, onDeleteCard,
-    onRecordLoanPayment, onAddLoan, onDeleteLoan,
+    onPayCard, onPayCardAmount, onAddCard, onDeleteCard,
+    onRecordLoanPayment, onPayLoanAmount, onAddLoan, onDeleteLoan,
     onRecordInstPayment, onAddInstallment, onDeleteInstallment,
-    onAddSubscription, onDeleteSubscription,
+    onAddSubscription, onDeleteSubscription, onUpdateSubscription,
   };
 
   let screen: React.ReactNode;
