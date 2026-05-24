@@ -41,6 +41,7 @@ export function AddModal({
   const [label, setLabel] = useState("");
   const [account, setAccount] = useState("");
   const [toAccount, setToAccount] = useState("");
+  const [transferring, setTransferring] = useState(false);
 
   const cats = useMemo(() => {
     if (kind === "income") return categories.filter((c) => c.kind === "income" || c.kind === "both");
@@ -63,8 +64,6 @@ export function AddModal({
   }, [cats, catId]);
 
   if (!open) return null;
-
-  const [transferring, setTransferring] = useState(false);
 
   const submit = async () => {
     const n = parseFloat(amount.replace(/,/g, ""));
