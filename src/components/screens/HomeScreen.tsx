@@ -357,7 +357,7 @@ export function HomeScreen({
                       <div style={{ fontSize: 20 }}>{b.icon}</div>
                       <div>
                         <div style={{ fontSize: 13.5, fontWeight: 700, color: THEME.text }}>{b.label}</div>
-                        <div style={{ fontSize: 11.5, color: THEME.textSec }}>{billType(b.type)} · {b.dueDate}</div>
+                        <div style={{ fontSize: 11.5, color: THEME.textSec }}>{billType(b.type)} · {b.date}</div>
                       </div>
                     </div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: THEME.expense, fontFamily: MONO }}>{fmt(b.amount)}</div>
