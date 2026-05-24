@@ -327,13 +327,14 @@ export async function addAccount(draft: {
   balance: number;
   color: string;
   emoji: string;
+  accountNumber: string;
 }): Promise<Account> {
   const userId = await requireUserId();
   const key = draft.short.toLowerCase().replace(/\s+/g, "") + "-" + Date.now();
   const created = await prisma.account.create({
     data: { userId, key, ...draft },
   });
-  return { key: created.key, label: created.label, short: created.short, balance: created.balance, color: created.color, emoji: created.emoji };
+  return { key: created.key, label: created.label, short: created.short, balance: created.balance, color: created.color, emoji: created.emoji, accountNumber: created.accountNumber ?? "" };
 }
 
 export async function transferBetweenAccounts(
@@ -364,7 +365,7 @@ export async function transferBetweenAccounts(
 
 export async function updateAccount(
   key: string,
-  data: { label: string; short: string; balance: number; color: string; emoji: string },
+  data: { label: string; short: string; balance: number; color: string; emoji: string; accountNumber: string },
 ): Promise<void> {
   const userId = await requireUserId();
   await prisma.account.updateMany({ where: { userId, key }, data });

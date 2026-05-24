@@ -34,14 +34,15 @@ model User {
 }
 
 model Account {
-  id      String @id @default(cuid())
-  userId  String
-  key     String
-  label   String
-  short   String
-  balance Float
-  color   String
-  emoji   String
+  id            String @id @default(cuid())
+  userId        String
+  key           String
+  label         String
+  short         String
+  balance       Float
+  color         String
+  emoji         String
+  accountNumber String @default("")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

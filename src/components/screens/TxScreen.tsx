@@ -14,12 +14,14 @@ export function TxScreen({
   txs,
   getCat,
   accountShort,
+  accountEmoji,
   onDelete,
   nav,
 }: {
   txs: Tx[];
   getCat: (key: string) => Category;
   accountShort: Record<string, string>;
+  accountEmoji: Record<string, string>;
   onDelete: (tx: Tx) => void;
   nav: NavFn;
 }) {
@@ -127,7 +129,14 @@ export function TxScreen({
                   <div style={{ padding: "0 12px" }}>
                     {items.map((tx, i) => (
                       <div key={tx.id} style={{ borderBottom: i === items.length - 1 ? "none" : "1px solid " + THEME.border }}>
-                        <TxRow tx={tx} cat={getCat(tx.categoryKey)} accountShort={accountShort[tx.accountKey] || ""} onClick={() => onDelete(tx)} />
+                        <TxRow
+                          tx={tx}
+                          cat={tx.tags.includes("transfer")
+                            ? { ...getCat("other"), icon: accountEmoji[tx.accountKey] ?? "⇄", color: "#6B6478" }
+                            : getCat(tx.categoryKey)}
+                          accountShort={accountShort[tx.accountKey] || ""}
+                          onClick={() => onDelete(tx)}
+                        />
                       </div>
                     ))}
                   </div>

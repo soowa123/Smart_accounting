@@ -16,6 +16,7 @@ export type Account = {
   balance: number;
   color: string;
   emoji: string;
+  accountNumber: string;
 };
 
 export type Tx = {

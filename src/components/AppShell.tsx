@@ -62,6 +62,12 @@ export function AppShell({ data }: { data: UserData }) {
     return m;
   }, [accounts]);
 
+  const accountEmoji = useMemo(() => {
+    const m: Record<string, string> = {};
+    accounts.forEach((a) => (m[a.key] = a.emoji));
+    return m;
+  }, [accounts]);
+
   const upcoming = useMemo(
     () => buildUpcoming(cards, loans, installments, subscriptions, todayISO()),
     [cards, loans, installments, subscriptions],
@@ -209,7 +215,7 @@ export function AppShell({ data }: { data: UserData }) {
       );
       break;
     case "tx":
-      screen = <TxScreen txs={txs} getCat={getCat} accountShort={accountShort} onDelete={onDelete} nav={nav} />;
+      screen = <TxScreen txs={txs} getCat={getCat} accountShort={accountShort} accountEmoji={accountEmoji} onDelete={onDelete} nav={nav} />;
       break;
     case "money":
       screen = (

@@ -63,7 +63,7 @@ export async function getUserData(): Promise<UserData | null> {
   return {
     displayName: user?.displayName ?? "",
     widgets,
-    accounts: accounts.map((a) => ({ key: a.key, label: a.label, short: a.short, balance: a.balance, color: a.color, emoji: a.emoji })),
+    accounts: accounts.map((a) => ({ key: a.key, label: a.label, short: a.short, balance: a.balance, color: a.color, emoji: a.emoji, accountNumber: a.accountNumber ?? "" })),
     categories: categories.map((c) => ({ key: c.key, label: c.label, en: c.en, icon: c.icon, color: c.color, kind: c.kind })),
     txs: txs.map((t) => ({
       id: t.id, date: t.date, time: t.time, amount: t.amount,
