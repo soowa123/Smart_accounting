@@ -17,6 +17,7 @@ import {
   addIou, deleteIou,
   addGoal, withdrawGoal, deleteGoal,
   setBudget, deleteBudget,
+  addCategory, deleteCategory,
 } from "@/app/(app)/actions";
 
 import { HomeScreen } from "@/components/screens/HomeScreen";
@@ -59,12 +60,13 @@ export function AppShell({ data }: { data: UserData }) {
   const [loans, setLoans] = useState<Loan[]>(data.loans);
   const [installments, setInstallments] = useState<Installment[]>(data.installments);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>(data.subscriptions);
+  const [categories, setCategories] = useState<Category[]>(data.categories);
 
   const catMap = useMemo(() => {
     const m: Record<string, Category> = {};
-    data.categories.forEach((c) => (m[c.key] = c));
+    categories.forEach((c) => (m[c.key] = c));
     return m;
-  }, [data.categories]);
+  }, [categories]);
 
   const fallbackCat: Category =
     catMap["other"] || { key: "other", label: "อื่นๆ", en: "Other", icon: "✨", color: "#71717A", kind: "both" };
@@ -235,6 +237,27 @@ export function AppShell({ data }: { data: UserData }) {
       await deleteBudget(categoryKey);
       setBudgetsAll((prev) => prev.filter((b) => !(b.categoryKey === categoryKey && b.month === monthKey)));
     } catch (e) { handleError(e); }
+  };
+
+  // ── Categories ───────────────────────────────────────────────────────────────
+
+  const onAddCategory = async (draft: Omit<Category, "key">) => {
+    try {
+      const created = await addCategory(draft);
+      setCategories((prev) => [...prev, created]);
+    } catch (e) { handleError(e); }
+  };
+
+  const onDeleteCategory = async (key: string) => {
+    if (!window.confirm("ลบหมวดหมู่นี้?")) return;
+    try {
+      await deleteCategory(key);
+      setCategories((prev) => prev.filter((c) => c.key !== key));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (msg === "CATEGORY_IN_USE") alert("⚠️ ไม่สามารถลบได้ เพราะมีรายการที่ใช้หมวดนี้อยู่");
+      else handleError(e);
+    }
   };
 
   // ── Accounts ─────────────────────────────────────────────────────────────────
@@ -438,7 +461,7 @@ export function AppShell({ data }: { data: UserData }) {
       screen = <MoreScreen nav={nav} />;
       break;
     case "budget":
-      screen = <BudgetScreen budgets={budgets} getCat={getCat} categories={data.categories} onSetBudget={onSetBudget} onDeleteBudget={onDeleteBudget} nav={nav} />;
+      screen = <BudgetScreen budgets={budgets} getCat={getCat} categories={categories} onSetBudget={onSetBudget} onDeleteBudget={onDeleteBudget} nav={nav} />;
       break;
     case "goals":
       screen = <GoalsScreen goals={goals} onDeposit={onDepositGoal} onWithdrawGoal={onWithdrawGoal} onDeleteGoal={onDeleteGoal} onAddGoal={onAddGoal} nav={nav} />;
@@ -458,7 +481,14 @@ export function AppShell({ data }: { data: UserData }) {
       screen = <IouScreen ious={ious} onAddIou={onAddIou} onDeleteIou={onDeleteIou} nav={nav} />;
       break;
     case "categories":
-      screen = <CategoriesScreen categories={data.categories} nav={nav} />;
+      screen = (
+        <CategoriesScreen
+          categories={categories}
+          onAddCategory={onAddCategory}
+          onDeleteCategory={onDeleteCategory}
+          nav={nav}
+        />
+      );
       break;
     case "settings":
       screen = (
@@ -480,7 +510,7 @@ export function AppShell({ data }: { data: UserData }) {
         onClose={() => setAdding(false)}
         onAdd={onAdd}
         onTransfer={onTransfer}
-        categories={data.categories}
+        categories={categories}
         accounts={accounts}
       />
     </>

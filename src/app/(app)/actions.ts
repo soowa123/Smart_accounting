@@ -683,6 +683,31 @@ export async function deleteBudget(categoryKey: string): Promise<void> {
   await prisma.budget.deleteMany({ where: { userId, categoryKey, month } });
 }
 
+// ── Categories ────────────────────────────────────────────────────────────────
+
+export async function addCategory(draft: {
+  label: string;
+  en: string;
+  icon: string;
+  color: string;
+  kind: string;
+}): Promise<{ key: string; label: string; en: string; icon: string; color: string; kind: string }> {
+  const userId = await requireUserId();
+  const key = "cat-" + Date.now();
+  const sort = await prisma.category.count({ where: { userId } });
+  const created = await prisma.category.create({
+    data: { userId, key, sort, ...draft },
+  });
+  return { key: created.key, label: created.label, en: created.en, icon: created.icon, color: created.color, kind: created.kind };
+}
+
+export async function deleteCategory(key: string): Promise<void> {
+  const userId = await requireUserId();
+  const count = await prisma.transaction.count({ where: { userId, categoryKey: key } });
+  if (count > 0) throw new Error("CATEGORY_IN_USE");
+  await prisma.category.deleteMany({ where: { userId, key } });
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 export async function logout(): Promise<void> {
