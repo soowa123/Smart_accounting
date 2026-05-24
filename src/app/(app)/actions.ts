@@ -109,12 +109,20 @@ export async function transferBetweenAccounts(
   const result = await prisma.$transaction(async (tx) => {
     const updFrom = await tx.account.update({ where: { id: from.id }, data: { balance: from.balance - amount } });
     const updTo = await tx.account.update({ where: { id: to.id }, data: { balance: to.balance + amount } });
-    const out = await tx.transaction.create({ data: { userId, date, time, amount: -amount, categoryKey: "other", accountKey: fromKey, label: `โอนไป ${to.label}`, tags: "[]" } });
-    const inp = await tx.transaction.create({ data: { userId, date, time, amount, categoryKey: "other", accountKey: toKey, label: `รับโอนจาก ${from.label}`, tags: "[]" } });
+    const out = await tx.transaction.create({ data: { userId, date, time, amount: -amount, categoryKey: "other", accountKey: fromKey, label: `โอนไป ${to.label}`, tags: '["transfer"]' } });
+    const inp = await tx.transaction.create({ data: { userId, date, time, amount, categoryKey: "other", accountKey: toKey, label: `รับโอนจาก ${from.label}`, tags: '["transfer"]' } });
     return { fromBalance: updFrom.balance, toBalance: updTo.balance, out, inp };
   });
-  const toTx = (r: typeof result.out): Tx => ({ id: r.id, date: r.date, time: r.time, amount: r.amount, categoryKey: r.categoryKey, accountKey: r.accountKey, label: r.label, tags: [] });
+  const toTx = (r: typeof result.out): Tx => ({ id: r.id, date: r.date, time: r.time, amount: r.amount, categoryKey: r.categoryKey, accountKey: r.accountKey, label: r.label, tags: ["transfer"] });
   return { fromBalance: result.fromBalance, toBalance: result.toBalance, txOut: toTx(result.out), txIn: toTx(result.inp) };
+}
+
+export async function updateAccount(
+  key: string,
+  data: { label: string; short: string; balance: number; color: string; emoji: string },
+): Promise<void> {
+  const userId = await requireUserId();
+  await prisma.account.updateMany({ where: { userId, key }, data });
 }
 
 export async function logout(): Promise<void> {

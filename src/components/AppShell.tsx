@@ -8,7 +8,7 @@ import { todayISO, currentMonthKey } from "@/lib/money";
 import { TabBar } from "@/components/TabBar";
 import { AddModal, type TxDraft } from "@/components/AddModal";
 import type { NavFn } from "@/components/screen-chrome";
-import { addTransaction, deleteTransaction, setWidget, depositGoal, addAccount, transferBetweenAccounts, logout } from "@/app/(app)/actions";
+import { addTransaction, deleteTransaction, setWidget, depositGoal, addAccount, transferBetweenAccounts, updateAccount, logout } from "@/app/(app)/actions";
 
 import { HomeScreen } from "@/components/screens/HomeScreen";
 import { TxScreen } from "@/components/screens/TxScreen";
@@ -107,6 +107,11 @@ export function AppShell({ data }: { data: UserData }) {
     setTxs((prev) => [txIn, txOut, ...prev]);
   };
 
+  const onUpdateAccount = async (key: string, data: Omit<Account, "key">) => {
+    await updateAccount(key, data);
+    setAccounts((prev) => prev.map((a) => (a.key === key ? { ...a, ...data } : a)));
+  };
+
   let screen: React.ReactNode;
   switch (tab) {
     case "home":
@@ -158,7 +163,7 @@ export function AppShell({ data }: { data: UserData }) {
       screen = <CalendarScreen upcoming={upcoming} nav={nav} />;
       break;
     case "accounts":
-      screen = <AccountsScreen accounts={accounts} nav={nav} onAddAccount={onAddAccount} onTransfer={onTransfer} />;
+      screen = <AccountsScreen accounts={accounts} txs={txs} getCat={getCat} nav={nav} onAddAccount={onAddAccount} onTransfer={onTransfer} onUpdateAccount={onUpdateAccount} />;
       break;
     case "iou":
       screen = <IouScreen ious={data.ious} nav={nav} />;

@@ -49,7 +49,7 @@ export function HomeScreen({
   const monthExpense = txs.filter((t) => t.amount < 0 && t.date.startsWith(monthKey)).reduce((s, t) => s + t.amount, 0);
   const upcoming7 = upcoming.slice(0, 4);
   const upcomingSum = upcoming.reduce((s, b) => s + b.amount, 0);
-  const recent = txs.slice(0, 5);
+  const recent = txs.filter((t) => !t.tags.includes("transfer")).slice(0, 5);
 
   const budgetSpent = budgets.reduce((s, b) => s + b.spent, 0);
   const budgetPlanned = budgets.reduce((s, b) => s + b.planned, 0);

@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { THEME, MONO } from "@/lib/theme";
-import { fmt } from "@/lib/money";
+import { fmt, thDayMonth } from "@/lib/money";
 import { Card, SoftButton, PrimaryButton } from "@/components/ui";
 import { ScreenHeader, type NavFn } from "@/components/screen-chrome";
-import type { Account } from "@/lib/types";
+import { Icon } from "@/components/icons";
+import type { Account, Category, Tx } from "@/lib/types";
 
 const PRESET_COLORS = ["#16A34A", "#7C3AED", "#F59E0B", "#3B82F6", "#EC4899", "#EF4444", "#0EA5E9", "#F97316"];
 const PRESET_EMOJIS = ["🏦", "💵", "💳", "🟢", "🟣", "🟠", "🔵", "🟡", "🔴", "💰", "🏧", "✨"];
@@ -19,7 +20,7 @@ const sheetStyle: React.CSSProperties = {
   width: "100%", maxWidth: 440, margin: "0 auto",
   background: THEME.surface, borderRadius: "20px 20px 0 0",
   padding: "20px 20px 40px",
-  maxHeight: "85vh", overflowY: "auto",
+  maxHeight: "90vh", overflowY: "auto",
 };
 const inputStyle: React.CSSProperties = {
   width: "100%", padding: "10px 12px",
@@ -27,21 +28,52 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 10, fontSize: 14, color: THEME.text,
   fontFamily: "inherit", outline: "none", boxSizing: "border-box",
 };
+const fieldLabel: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: THEME.textSec, marginBottom: 6 };
 
 export function AccountsScreen({
   accounts,
+  txs,
+  getCat,
   nav,
   onAddAccount,
   onTransfer,
+  onUpdateAccount,
 }: {
   accounts: Account[];
+  txs: Tx[];
+  getCat: (key: string) => Category;
   nav: NavFn;
   onAddAccount: (draft: Omit<Account, "key">) => Promise<void>;
   onTransfer: (fromKey: string, toKey: string, amount: number) => Promise<void>;
+  onUpdateAccount: (key: string, data: Omit<Account, "key">) => Promise<void>;
 }) {
   const total = accounts.reduce((s, a) => s + a.balance, 0);
 
-  // --- Add Account modal state ---
+  // ── Detail / edit state ──────────────────────────────────────
+  const [detailKey, setDetailKey] = useState<string | null>(null);
+  const detailAcc = accounts.find((a) => a.key === detailKey) ?? null;
+  const [eLabel, setELabel] = useState("");
+  const [eShort, setEShort] = useState("");
+  const [eBalance, setEBalance] = useState("");
+  const [eColor, setEColor] = useState(PRESET_COLORS[0]);
+  const [eEmoji, setEEmoji] = useState(PRESET_EMOJIS[0]);
+  const [eSaving, setESaving] = useState(false);
+
+  const openDetail = (a: Account) => {
+    setDetailKey(a.key);
+    setELabel(a.label); setEShort(a.short);
+    setEBalance(String(a.balance)); setEColor(a.color); setEEmoji(a.emoji);
+  };
+  const handleUpdate = async () => {
+    if (!detailKey || !eLabel.trim() || !eShort.trim()) return;
+    setESaving(true);
+    try {
+      await onUpdateAccount(detailKey, { label: eLabel.trim(), short: eShort.trim().toUpperCase(), balance: parseFloat(eBalance) || 0, color: eColor, emoji: eEmoji });
+      setDetailKey(null);
+    } finally { setESaving(false); }
+  };
+
+  // ── Add Account state ────────────────────────────────────────
   const [showAdd, setShowAdd] = useState(false);
   const [aLabel, setALabel] = useState("");
   const [aShort, setAShort] = useState("");
@@ -60,29 +92,131 @@ export function AccountsScreen({
     } finally { setASaving(false); }
   };
 
-  // --- Transfer modal state ---
+  // ── Transfer state ───────────────────────────────────────────
   const [showTx, setShowTx] = useState(false);
   const [tFrom, setTFrom] = useState("");
   const [tTo, setTTo] = useState("");
   const [tAmt, setTAmt] = useState("");
   const [tSaving, setTSaving] = useState(false);
 
-  const openTransfer = () => {
-    setTFrom(accounts[0]?.key ?? "");
-    setTTo(accounts[1]?.key ?? "");
-    setTAmt("");
-    setShowTx(true);
-  };
+  const openTransfer = () => { setTFrom(accounts[0]?.key ?? ""); setTTo(accounts[1]?.key ?? ""); setTAmt(""); setShowTx(true); };
   const handleTransfer = async () => {
     const amount = parseFloat(tAmt);
     if (!tFrom || !tTo || !(amount > 0) || tFrom === tTo) return;
     setTSaving(true);
-    try {
-      await onTransfer(tFrom, tTo, amount);
-      setShowTx(false);
-    } finally { setTSaving(false); }
+    try { await onTransfer(tFrom, tTo, amount); setShowTx(false); }
+    finally { setTSaving(false); }
   };
 
+  // Transfer preview
+  const tFromAcc = accounts.find((a) => a.key === tFrom);
+  const tToAcc = accounts.find((a) => a.key === tTo);
+  const tAmtNum = parseFloat(tAmt) || 0;
+  const showPreview = tAmtNum > 0 && tFromAcc && tToAcc && tFrom !== tTo;
+
+  // ── Detail view ──────────────────────────────────────────────
+  if (detailAcc) {
+    const accTxs = txs.filter((t) => t.accountKey === detailAcc.key).slice(0, 30);
+    return (
+      <div style={{ paddingBottom: 100 }}>
+        {/* Header with back */}
+        <div style={{ padding: "60px 20px 0", display: "flex", alignItems: "center", gap: 12 }}>
+          <button onClick={() => setDetailKey(null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+            <Icon name="chevronLeft" size={22} color={THEME.text} />
+          </button>
+          <div>
+            <div style={{ fontSize: 11, color: THEME.textSec, fontWeight: 600, textTransform: "uppercase" }}>บัญชี</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: THEME.text }}>{detailAcc.label}</div>
+          </div>
+        </div>
+
+        {/* Balance card */}
+        <div style={{ padding: "16px 20px 0" }}>
+          <Card padding={16} style={{ background: `linear-gradient(135deg, ${detailAcc.color}, ${detailAcc.color}AA)` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ fontSize: 36 }}>{detailAcc.emoji}</div>
+              <div>
+                <div style={{ fontSize: 12, color: "#fff", opacity: 0.85, fontWeight: 600 }}>ยอดคงเหลือ</div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: "#fff", fontFamily: MONO }}>{fmt(detailAcc.balance)}</div>
+                <div style={{ fontSize: 11, color: "#fff", opacity: 0.8, marginTop: 2, fontFamily: MONO }}>•••• {detailAcc.short}</div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Edit form */}
+        <div style={{ padding: "16px 20px 0" }}>
+          <Card padding={16}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: THEME.text, marginBottom: 14 }}>✏️ แก้ไขข้อมูลบัญชี</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <div style={fieldLabel}>ชื่อบัญชี</div>
+                <input style={inputStyle} value={eLabel} onChange={(e) => setELabel(e.target.value)} />
+              </div>
+              <div>
+                <div style={fieldLabel}>รหัสย่อ</div>
+                <input style={inputStyle} value={eShort} maxLength={6} onChange={(e) => setEShort(e.target.value.toUpperCase())} />
+              </div>
+              <div>
+                <div style={fieldLabel}>ยอดคงเหลือ (฿)</div>
+                <input style={inputStyle} type="number" value={eBalance} onChange={(e) => setEBalance(e.target.value)} />
+              </div>
+              <div>
+                <div style={fieldLabel}>สี</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {PRESET_COLORS.map((c) => (
+                    <button key={c} onClick={() => setEColor(c)} style={{ width: 32, height: 32, borderRadius: 10, background: c, border: "none", cursor: "pointer", outline: eColor === c ? `3px solid ${THEME.text}` : "none", outlineOffset: 2 }} />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div style={fieldLabel}>ไอคอน</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {PRESET_EMOJIS.map((em) => (
+                    <button key={em} onClick={() => setEEmoji(em)} style={{ width: 38, height: 38, borderRadius: 10, fontSize: 20, border: "none", cursor: "pointer", background: eEmoji === em ? THEME.primary + "30" : THEME.surfaceAlt, outline: eEmoji === em ? `2px solid ${THEME.primary}` : "none" }}>{em}</button>
+                  ))}
+                </div>
+              </div>
+              <PrimaryButton onClick={handleUpdate} disabled={eSaving || !eLabel.trim() || !eShort.trim()}>
+                {eSaving ? "กำลังบันทึก…" : "บันทึกการแก้ไข"}
+              </PrimaryButton>
+            </div>
+          </Card>
+        </div>
+
+        {/* Transaction history */}
+        <div style={{ padding: "16px 20px 0" }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: THEME.text, marginBottom: 10 }}>ประวัติการเคลื่อนไหว</div>
+          {accTxs.length === 0 ? (
+            <div style={{ color: THEME.textSec, fontSize: 13, textAlign: "center", padding: "20px 0" }}>ยังไม่มีรายการ</div>
+          ) : (
+            <Card padding={0}>
+              {accTxs.map((t, i) => {
+                const cat = getCat(t.categoryKey);
+                const isTransfer = t.tags.includes("transfer");
+                return (
+                  <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderBottom: i < accTxs.length - 1 ? `1px solid ${THEME.border}` : "none" }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 11, background: (isTransfer ? "#6B6478" : cat.color) + "20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 }}>
+                      {isTransfer ? "⇄" : cat.icon}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: THEME.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.label}</div>
+                      <div style={{ fontSize: 11, color: THEME.textSec, marginTop: 1 }}>{thDayMonth(t.date)} · {t.time}</div>
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: t.amount >= 0 ? THEME.income : THEME.expense, fontFamily: MONO, flexShrink: 0 }}>
+                      {t.amount >= 0 ? "+" : ""}{fmt(t.amount)}
+                    </div>
+                  </div>
+                );
+              })}
+            </Card>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── List view ────────────────────────────────────────────────
   return (
     <div style={{ paddingBottom: 100 }}>
       <ScreenHeader title="บัญชีของฉัน" subtitle="Accounts & Wallets" nav={nav} />
@@ -96,18 +230,23 @@ export function AccountsScreen({
 
       <div style={{ padding: "16px 20px 0", display: "flex", flexDirection: "column", gap: 10 }}>
         {accounts.map((a) => (
-          <Card key={a.key} padding={14}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 46, height: 46, borderRadius: 14, background: a.color + "20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
-                {a.emoji}
+          <button key={a.key} onClick={() => openDetail(a)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
+            <Card padding={14}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 46, height: 46, borderRadius: 14, background: a.color + "20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
+                  {a.emoji}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14.5, fontWeight: 700, color: THEME.text }}>{a.label}</div>
+                  <div style={{ fontSize: 11, color: THEME.textSec, marginTop: 1, fontFamily: MONO }}>•••• {a.short}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text, fontFamily: MONO }}>{fmt(a.balance)}</div>
+                  <Icon name="chevronRight" size={16} color={THEME.textMuted} />
+                </div>
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14.5, fontWeight: 700, color: THEME.text }}>{a.label}</div>
-                <div style={{ fontSize: 11, color: THEME.textSec, marginTop: 1, fontFamily: MONO }}>•••• {a.short}</div>
-              </div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text, fontFamily: MONO }}>{fmt(a.balance)}</div>
-            </div>
-          </Card>
+            </Card>
+          </button>
         ))}
 
         <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
@@ -124,42 +263,20 @@ export function AccountsScreen({
               <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text }}>+ เพิ่มบัญชี</div>
               <button onClick={() => setShowAdd(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: THEME.textSec }}>✕</button>
             </div>
-
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div><div style={fieldLabel}>ชื่อบัญชี *</div><input style={inputStyle} placeholder="เช่น KBank Savings" value={aLabel} onChange={(e) => setALabel(e.target.value)} /></div>
+              <div><div style={fieldLabel}>รหัสย่อ * (2-5 ตัวอักษร)</div><input style={inputStyle} placeholder="เช่น KBANK" value={aShort} maxLength={6} onChange={(e) => setAShort(e.target.value.toUpperCase())} /></div>
+              <div><div style={fieldLabel}>ยอดเริ่มต้น (฿)</div><input style={inputStyle} type="number" placeholder="0" value={aBalance} onChange={(e) => setABalance(e.target.value)} /></div>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: THEME.textSec, marginBottom: 6 }}>ชื่อบัญชี *</div>
-                <input style={inputStyle} placeholder="เช่น KBank Savings" value={aLabel} onChange={(e) => setALabel(e.target.value)} />
-              </div>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: THEME.textSec, marginBottom: 6 }}>รหัสย่อ * (2-5 ตัวอักษร)</div>
-                <input style={inputStyle} placeholder="เช่น KBANK" value={aShort} maxLength={6}
-                  onChange={(e) => setAShort(e.target.value.toUpperCase())} />
-              </div>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: THEME.textSec, marginBottom: 6 }}>ยอดเริ่มต้น (฿)</div>
-                <input style={inputStyle} type="number" placeholder="0" value={aBalance} onChange={(e) => setABalance(e.target.value)} />
-              </div>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: THEME.textSec, marginBottom: 8 }}>สี</div>
+                <div style={fieldLabel}>สี</div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {PRESET_COLORS.map((c) => (
-                    <button key={c} onClick={() => setAColor(c)} style={{
-                      width: 32, height: 32, borderRadius: 10, background: c, border: "none", cursor: "pointer",
-                      outline: aColor === c ? `3px solid ${THEME.text}` : "none", outlineOffset: 2,
-                    }} />
-                  ))}
+                  {PRESET_COLORS.map((c) => (<button key={c} onClick={() => setAColor(c)} style={{ width: 32, height: 32, borderRadius: 10, background: c, border: "none", cursor: "pointer", outline: aColor === c ? `3px solid ${THEME.text}` : "none", outlineOffset: 2 }} />))}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: THEME.textSec, marginBottom: 8 }}>ไอคอน</div>
+                <div style={fieldLabel}>ไอคอน</div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {PRESET_EMOJIS.map((em) => (
-                    <button key={em} onClick={() => setAEmoji(em)} style={{
-                      width: 38, height: 38, borderRadius: 10, fontSize: 20, border: "none", cursor: "pointer",
-                      background: aEmoji === em ? THEME.primary + "30" : THEME.surfaceAlt,
-                      outline: aEmoji === em ? `2px solid ${THEME.primary}` : "none",
-                    }}>{em}</button>
-                  ))}
+                  {PRESET_EMOJIS.map((em) => (<button key={em} onClick={() => setAEmoji(em)} style={{ width: 38, height: 38, borderRadius: 10, fontSize: 20, border: "none", cursor: "pointer", background: aEmoji === em ? THEME.primary + "30" : THEME.surfaceAlt, outline: aEmoji === em ? `2px solid ${THEME.primary}` : "none" }}>{em}</button>))}
                 </div>
               </div>
               <PrimaryButton onClick={handleAdd} disabled={aSaving || !aLabel.trim() || !aShort.trim()}>
@@ -178,31 +295,48 @@ export function AccountsScreen({
               <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text }}>⇄ โอนระหว่างบัญชี</div>
               <button onClick={() => setShowTx(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: THEME.textSec }}>✕</button>
             </div>
-
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: THEME.textSec, marginBottom: 6 }}>จากบัญชี</div>
+                <div style={fieldLabel}>จากบัญชี</div>
                 <select style={inputStyle} value={tFrom} onChange={(e) => setTFrom(e.target.value)}>
-                  {accounts.map((a) => (
-                    <option key={a.key} value={a.key}>{a.emoji} {a.label} ({fmt(a.balance)})</option>
-                  ))}
+                  {accounts.map((a) => (<option key={a.key} value={a.key}>{a.emoji} {a.label} ({fmt(a.balance)})</option>))}
                 </select>
               </div>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: THEME.textSec, marginBottom: 6 }}>ไปบัญชี</div>
+                <div style={fieldLabel}>ไปบัญชี</div>
                 <select style={inputStyle} value={tTo} onChange={(e) => setTTo(e.target.value)}>
-                  {accounts.map((a) => (
-                    <option key={a.key} value={a.key}>{a.emoji} {a.label} ({fmt(a.balance)})</option>
-                  ))}
+                  {accounts.map((a) => (<option key={a.key} value={a.key}>{a.emoji} {a.label} ({fmt(a.balance)})</option>))}
                 </select>
               </div>
-              {tFrom === tTo && (
-                <div style={{ fontSize: 12, color: THEME.expense, fontWeight: 600 }}>⚠️ ต้องเลือกบัญชีต่างกัน</div>
-              )}
+              {tFrom === tTo && <div style={{ fontSize: 12, color: THEME.expense, fontWeight: 600 }}>⚠️ ต้องเลือกบัญชีต่างกัน</div>}
               <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: THEME.textSec, marginBottom: 6 }}>จำนวนเงิน (฿)</div>
+                <div style={fieldLabel}>จำนวนเงิน (฿)</div>
                 <input style={inputStyle} type="number" placeholder="0" value={tAmt} onChange={(e) => setTAmt(e.target.value)} />
               </div>
+
+              {/* Balance preview */}
+              {showPreview && (
+                <div style={{ background: THEME.surfaceAlt, borderRadius: 12, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: THEME.textSec, marginBottom: 2 }}>ยอดหลังโอน</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ fontSize: 13, color: THEME.text }}>{tFromAcc!.emoji} {tFromAcc!.label}</div>
+                    <div style={{ fontSize: 13, fontFamily: MONO }}>
+                      <span style={{ color: THEME.textSec }}>{fmt(tFromAcc!.balance)}</span>
+                      <span style={{ color: THEME.textMuted }}> → </span>
+                      <span style={{ color: tFromAcc!.balance - tAmtNum < 0 ? THEME.expense : THEME.text, fontWeight: 700 }}>{fmt(tFromAcc!.balance - tAmtNum)}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ fontSize: 13, color: THEME.text }}>{tToAcc!.emoji} {tToAcc!.label}</div>
+                    <div style={{ fontSize: 13, fontFamily: MONO }}>
+                      <span style={{ color: THEME.textSec }}>{fmt(tToAcc!.balance)}</span>
+                      <span style={{ color: THEME.textMuted }}> → </span>
+                      <span style={{ color: THEME.income, fontWeight: 700 }}>{fmt(tToAcc!.balance + tAmtNum)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <PrimaryButton onClick={handleTransfer} disabled={tSaving || tFrom === tTo || !(parseFloat(tAmt) > 0)}>
                 {tSaving ? "กำลังโอน…" : "ยืนยันการโอน"}
               </PrimaryButton>
