@@ -5,21 +5,34 @@ import { requireUserId } from "@/lib/data";
 import { signOut } from "@/lib/auth";
 import type { Tx, Account, Card, Loan, Installment, Subscription } from "@/lib/types";
 
-function advanceMonth(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00");
-  d.setMonth(d.getMonth() + 1);
-  return d.toISOString().slice(0, 10);
+// Format local date to YYYY-MM-DD without UTC shift
+function localISO(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
+// Fix #4: handle month-end overflow (Jan 31 → Feb 28, not Mar 3)
+function advanceMonth(dateStr: string): string {
+  const [y, mo, d] = dateStr.split("-").map(Number);
+  const newMo = mo === 12 ? 1 : mo + 1;
+  const newY = mo === 12 ? y + 1 : y;
+  const lastDay = new Date(newY, newMo, 0).getDate(); // day 0 of next month = last day of newMo
+  const clampedDay = Math.min(d, lastDay);
+  return `${newY}-${String(newMo).padStart(2, "0")}-${String(clampedDay).padStart(2, "0")}`;
+}
+
+// Fix #12: use local time, not UTC, so date doesn't shift by timezone
 function nextDueFromDay(dueDay: number): string {
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth();
   const day = today.getDate();
   if (dueDay > day) {
-    return new Date(year, month, dueDay).toISOString().slice(0, 10);
+    return localISO(new Date(year, month, dueDay));
   } else {
-    return new Date(year, month + 1, dueDay).toISOString().slice(0, 10);
+    return localISO(new Date(year, month + 1, dueDay));
   }
 }
 
@@ -49,8 +62,13 @@ export async function payCard(
   accountKey: string,
 ): Promise<{ card: Card; tx: Tx }> {
   const userId = await requireUserId();
-  const card = await prisma.card.findFirst({ where: { userId, key } });
+  const [card, account] = await Promise.all([
+    prisma.card.findFirst({ where: { userId, key } }),
+    prisma.account.findFirst({ where: { userId, key: accountKey } }),
+  ]);
   if (!card) throw new Error("NOT_FOUND");
+  // Fix #8: guard against paying a zero-balance card
+  if (card.fullPay <= 0) throw new Error("NOTHING_TO_PAY");
 
   let payAmount: number;
   let newUsed: number;
@@ -71,9 +89,10 @@ export async function payCard(
 
   const newDueDate = nextDueFromDay(card.dueDay);
   const now = new Date();
-  const date = now.toISOString().slice(0, 10);
+  const date = localISO(now);
   const time = now.toTimeString().slice(0, 5);
 
+  // Fix #1: update account balance in DB inside the same transaction
   const [updatedCard, createdTx] = await prisma.$transaction([
     prisma.card.update({
       where: { id: card.id },
@@ -85,6 +104,7 @@ export async function payCard(
         accountKey, label: `ชำระบัตร ${card.name}`, tags: '["card-payment"]',
       },
     }),
+    ...(account ? [prisma.account.update({ where: { id: account.id }, data: { balance: account.balance - payAmount } })] : []),
   ]);
 
   return {
@@ -128,7 +148,10 @@ export async function recordLoanPayment(
   accountKey: string,
 ): Promise<{ loan: Loan; tx: Tx }> {
   const userId = await requireUserId();
-  const loan = await prisma.loan.findFirst({ where: { userId, key } });
+  const [loan, account] = await Promise.all([
+    prisma.loan.findFirst({ where: { userId, key } }),
+    prisma.account.findFirst({ where: { userId, key: accountKey } }),
+  ]);
   if (!loan) throw new Error("NOT_FOUND");
 
   const interest = (loan.remaining * loan.rate) / 100 / 12;
@@ -139,7 +162,7 @@ export async function recordLoanPayment(
   const newNextDue = advanceMonth(loan.nextDue);
 
   const now = new Date();
-  const date = now.toISOString().slice(0, 10);
+  const date = localISO(now);
   const time = now.toTimeString().slice(0, 5);
 
   const [updatedLoan, createdTx] = await prisma.$transaction([
@@ -153,6 +176,8 @@ export async function recordLoanPayment(
         accountKey, label: `ผ่อน ${loan.label} งวด ${loan.paidTerms + 1}`, tags: '["loan-payment"]',
       },
     }),
+    // Fix #1: update account balance in DB
+    ...(account ? [prisma.account.update({ where: { id: account.id }, data: { balance: account.balance - loan.monthly } })] : []),
   ]);
 
   return {
@@ -195,14 +220,17 @@ export async function recordInstPayment(
   accountKey: string,
 ): Promise<{ inst: Installment; tx: Tx }> {
   const userId = await requireUserId();
-  const inst = await prisma.installment.findFirst({ where: { userId, key } });
+  const [inst, account] = await Promise.all([
+    prisma.installment.findFirst({ where: { userId, key } }),
+    prisma.account.findFirst({ where: { userId, key: accountKey } }),
+  ]);
   if (!inst) throw new Error("NOT_FOUND");
 
   const newPaid = inst.paid + 1;
   const newNextDue = advanceMonth(inst.nextDue);
 
   const now = new Date();
-  const date = now.toISOString().slice(0, 10);
+  const date = localISO(now);
   const time = now.toTimeString().slice(0, 5);
 
   const [updatedInst, createdTx] = await prisma.$transaction([
@@ -216,6 +244,8 @@ export async function recordInstPayment(
         accountKey, label: `ผ่อน ${inst.label} งวด ${inst.paid + 1}`, tags: '["inst-payment"]',
       },
     }),
+    // Fix #1: update account balance in DB
+    ...(account ? [prisma.account.update({ where: { id: account.id }, data: { balance: account.balance - inst.monthly } })] : []),
   ]);
 
   return {
@@ -349,6 +379,8 @@ export async function transferBetweenAccounts(
     prisma.account.findFirst({ where: { userId, key: toKey } }),
   ]);
   if (!from || !to) throw new Error("NOT_FOUND");
+  // Fix #6: prevent negative balance
+  if (from.balance < amount) throw new Error("INSUFFICIENT_BALANCE");
   const now = new Date();
   const date = now.toISOString().slice(0, 10);
   const time = now.toTimeString().slice(0, 5);
@@ -378,8 +410,12 @@ export async function payCardAmount(
 ): Promise<{ card: Card; tx: Tx }> {
   const userId = await requireUserId();
   if (!(amount > 0)) throw new Error("INVALID_AMOUNT");
-  const card = await prisma.card.findFirst({ where: { userId, key } });
+  const [card, account] = await Promise.all([
+    prisma.card.findFirst({ where: { userId, key } }),
+    prisma.account.findFirst({ where: { userId, key: accountKey } }),
+  ]);
   if (!card) throw new Error("NOT_FOUND");
+  if (card.fullPay <= 0) throw new Error("NOTHING_TO_PAY");
 
   const payAmount = Math.min(amount, card.fullPay);
   const newUsed = Math.max(0, card.used - payAmount);
@@ -387,7 +423,7 @@ export async function payCardAmount(
   const newMinPay = newFullPay <= 0 ? 0 : Math.max(500, Math.round(newFullPay * 0.05));
   const newDueDate = nextDueFromDay(card.dueDay);
   const now = new Date();
-  const date = now.toISOString().slice(0, 10);
+  const date = localISO(now);
   const time = now.toTimeString().slice(0, 5);
 
   const [updatedCard, createdTx] = await prisma.$transaction([
@@ -401,6 +437,8 @@ export async function payCardAmount(
         accountKey, label: `ชำระบัตร ${card.name}`, tags: '["card-payment"]',
       },
     }),
+    // Fix #1: update account balance in DB
+    ...(account ? [prisma.account.update({ where: { id: account.id }, data: { balance: account.balance - payAmount } })] : []),
   ]);
 
   return {
@@ -425,7 +463,10 @@ export async function payLoanAmount(
 ): Promise<{ loan: Loan; tx: Tx }> {
   const userId = await requireUserId();
   if (!(amount > 0)) throw new Error("INVALID_AMOUNT");
-  const loan = await prisma.loan.findFirst({ where: { userId, key } });
+  const [loan, account] = await Promise.all([
+    prisma.loan.findFirst({ where: { userId, key } }),
+    prisma.account.findFirst({ where: { userId, key: accountKey } }),
+  ]);
   if (!loan) throw new Error("NOT_FOUND");
 
   const payAmount = Math.min(amount, loan.remaining);
@@ -436,7 +477,7 @@ export async function payLoanAmount(
   const newPaidTerms = loan.paidTerms + 1;
   const newNextDue = advanceMonth(loan.nextDue);
   const now = new Date();
-  const date = now.toISOString().slice(0, 10);
+  const date = localISO(now);
   const time = now.toTimeString().slice(0, 5);
 
   const [updatedLoan, createdTx] = await prisma.$transaction([
@@ -450,6 +491,8 @@ export async function payLoanAmount(
         accountKey, label: `ผ่อน ${loan.label} งวด ${loan.paidTerms + 1}`, tags: '["loan-payment"]',
       },
     }),
+    // Fix #1: update account balance in DB
+    ...(account ? [prisma.account.update({ where: { id: account.id }, data: { balance: account.balance - payAmount } })] : []),
   ]);
 
   return {
@@ -474,6 +517,24 @@ export async function updateSubscription(
 ): Promise<void> {
   const userId = await requireUserId();
   await prisma.subscription.updateMany({ where: { userId, key }, data });
+}
+
+// Fix #10: add IOU entry
+export async function addIou(draft: { name: string; type: string; amount: number; note: string; date: string }) {
+  const userId = await requireUserId();
+  if (!(draft.amount > 0)) throw new Error("INVALID_AMOUNT");
+  const created = await prisma.iou.create({ data: { userId, ...draft } });
+  return { id: created.id, name: created.name, type: created.type, amount: created.amount, note: created.note, date: created.date };
+}
+
+// Fix #11: add a new savings goal
+export async function addGoal(draft: { label: string; icon: string; target: number; saved: number; deadline: string; color: string }) {
+  const userId = await requireUserId();
+  if (!(draft.target > 0)) throw new Error("INVALID_TARGET");
+  const key = `goal-${Date.now()}`;
+  const sort = await prisma.goal.count({ where: { userId } });
+  const created = await prisma.goal.create({ data: { userId, key, sort, ...draft } });
+  return { key: created.key, label: created.label, icon: created.icon, target: created.target, saved: created.saved, deadline: created.deadline, color: created.color };
 }
 
 export async function logout(): Promise<void> {

@@ -222,7 +222,7 @@ function PayCardModal({
             opacity: !accountKey || busy ? 0.5 : 1,
           }}
         >
-          {busy ? "กำลังบันทึก..." : `ยืนยันจ่าย ฿${fmt(amount)}`}
+          {busy ? "กำลังบันทึก..." : `ยืนยันจ่าย ${fmt(amount)}`}
         </button>
       </div>
     </div>
@@ -295,7 +295,7 @@ function PayCardCustomModal({
             opacity: !valid || busy ? 0.5 : 1,
           }}
         >
-          {busy ? "กำลังบันทึก..." : `ยืนยันจ่าย ฿${fmt(amount)}`}
+          {busy ? "กำลังบันทึก..." : `ยืนยันจ่าย ${fmt(amount)}`}
         </button>
       </div>
     </div>
@@ -368,7 +368,7 @@ function PayLoanCustomModal({
             opacity: !valid || busy ? 0.5 : 1,
           }}
         >
-          {busy ? "กำลังบันทึก..." : `ยืนยันจ่าย ฿${fmt(amount)}`}
+          {busy ? "กำลังบันทึก..." : `ยืนยันจ่าย ${fmt(amount)}`}
         </button>
       </div>
     </div>
@@ -619,13 +619,14 @@ function CardsView({
                   <ProgressBar value={c.used} max={c.limitAmount} color={c.gradientFrom} height={6} />
                 </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-                  <SoftButton color={c.gradientFrom} full style={{ flex: 1 }} onClick={() => setPayModal({ card: c, payFull: true })}>
+                  {/* Fix #8: dim buttons when nothing to pay */}
+                  <SoftButton color={c.gradientFrom} full style={{ flex: 1, opacity: c.fullPay <= 0 ? 0.35 : 1 }} onClick={() => c.fullPay > 0 && setPayModal({ card: c, payFull: true })}>
                     จ่ายเต็มจำนวน
                   </SoftButton>
-                  <SoftButton color={THEME.textSec} style={{ background: "rgba(31,27,46,0.06)" }} onClick={() => setPayModal({ card: c, payFull: false })}>
+                  <SoftButton color={THEME.textSec} style={{ background: "rgba(31,27,46,0.06)", opacity: c.minPay <= 0 ? 0.35 : 1 }} onClick={() => c.minPay > 0 && setPayModal({ card: c, payFull: false })}>
                     ขั้นต่ำ {fmt(c.minPay)}
                   </SoftButton>
-                  <SoftButton color={THEME.purple} style={{ background: THEME.purpleSoft }} onClick={() => setCustomPayCard(c)}>
+                  <SoftButton color={THEME.purple} style={{ background: THEME.purpleSoft, opacity: c.fullPay <= 0 ? 0.35 : 1 }} onClick={() => c.fullPay > 0 && setCustomPayCard(c)}>
                     💡 จ่ายตามใจ
                   </SoftButton>
                 </div>
@@ -762,7 +763,7 @@ function PayLoanModal({
             opacity: !accountKey || busy ? 0.5 : 1,
           }}
         >
-          {busy ? "กำลังบันทึก..." : `ยืนยันจ่าย ฿${fmt(loan.monthly)}`}
+          {busy ? "กำลังบันทึก..." : `ยืนยันจ่าย ${fmt(loan.monthly)}`}
         </button>
       </div>
     </div>
@@ -1009,7 +1010,7 @@ function PayInstModal({
             opacity: !accountKey || busy ? 0.5 : 1,
           }}
         >
-          {busy ? "กำลังบันทึก..." : `ยืนยันจ่าย ฿${fmt(inst.monthly)}`}
+          {busy ? "กำลังบันทึก..." : `ยืนยันจ่าย ${fmt(inst.monthly)}`}
         </button>
       </div>
     </div>

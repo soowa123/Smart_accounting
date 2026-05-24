@@ -87,7 +87,17 @@ export async function getUserData(): Promise<UserData | null> {
     subscriptions: subscriptions.map((s) => ({
       key: s.key, label: s.label, icon: s.icon, amount: s.amount, cycle: s.cycle, nextDue: s.nextDue, color: s.color,
     })),
-    budgets: budgets.map((b) => ({ categoryKey: b.categoryKey, month: b.month, planned: b.planned, spent: b.spent })),
+    // Fix #3: compute spent from actual transactions (DB value is never updated)
+    budgets: (() => {
+      const monthKey = new Date().toISOString().slice(0, 7);
+      const spentByCat: Record<string, number> = {};
+      txs.forEach((t) => {
+        if (t.date.startsWith(monthKey) && t.amount < 0 && !safeTags(t.tags).includes("transfer")) {
+          spentByCat[t.categoryKey] = (spentByCat[t.categoryKey] || 0) + Math.abs(t.amount);
+        }
+      });
+      return budgets.map((b) => ({ categoryKey: b.categoryKey, month: b.month, planned: b.planned, spent: spentByCat[b.categoryKey] || 0 }));
+    })(),
     goals: goals.map((g) => ({ key: g.key, label: g.label, icon: g.icon, target: g.target, saved: g.saved, deadline: g.deadline, color: g.color })),
     ious: ious.map((i) => ({ id: i.id, name: i.name, type: i.type, amount: i.amount, note: i.note, date: i.date })),
     netWorth: netWorth.map((n) => ({ idx: n.idx, month: n.month, value: n.value })),

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { UserData } from "@/lib/data";
-import type { Category, Tx, Goal, Widgets, Account, Card as CardT, Loan, Installment, Subscription } from "@/lib/types";
+import type { Category, Tx, Goal, Iou, Widgets, Account, Card as CardT, Loan, Installment, Subscription } from "@/lib/types";
 import { buildUpcoming, buildMonthly } from "@/lib/derive";
 import { todayISO, currentMonthKey } from "@/lib/money";
 import { TabBar } from "@/components/TabBar";
@@ -14,6 +14,7 @@ import {
   addLoan, deleteLoan, recordLoanPayment, payLoanAmount,
   addInstallment, deleteInstallment, recordInstPayment,
   addSubscription, deleteSubscription, updateSubscription,
+  addIou, addGoal,
 } from "@/app/(app)/actions";
 
 import { HomeScreen } from "@/components/screens/HomeScreen";
@@ -39,6 +40,7 @@ export function AppShell({ data }: { data: UserData }) {
 
   const [txs, setTxs] = useState<Tx[]>(data.txs);
   const [goals, setGoals] = useState<Goal[]>(data.goals);
+  const [ious, setIous] = useState<Iou[]>(data.ious);
   const [widgets, setWidgets] = useState<Widgets>(data.widgets);
   const [accounts, setAccounts] = useState<Account[]>(data.accounts);
   const [cards, setCards] = useState<CardT[]>(data.cards);
@@ -107,6 +109,16 @@ export function AppShell({ data }: { data: UserData }) {
   const onDepositGoal = async (key: string, amount: number) => {
     const saved = await depositGoal(key, amount);
     setGoals((prev) => prev.map((g) => (g.key === key ? { ...g, saved } : g)));
+  };
+
+  const onAddGoal = async (draft: Omit<Goal, "key">) => {
+    const created = await addGoal(draft);
+    setGoals((prev) => [...prev, created]);
+  };
+
+  const onAddIou = async (draft: { name: string; type: string; amount: number; note: string; date: string }) => {
+    const created = await addIou(draft);
+    setIous((prev) => [created, ...prev]);
   };
 
   const onAddAccount = async (draft: Omit<Account, "key">) => {
@@ -257,7 +269,7 @@ export function AppShell({ data }: { data: UserData }) {
       screen = <BudgetScreen budgets={budgets} getCat={getCat} nav={nav} />;
       break;
     case "goals":
-      screen = <GoalsScreen goals={goals} onDeposit={onDepositGoal} nav={nav} />;
+      screen = <GoalsScreen goals={goals} onDeposit={onDepositGoal} onAddGoal={onAddGoal} nav={nav} />;
       break;
     case "analytics":
       screen = (
@@ -271,7 +283,7 @@ export function AppShell({ data }: { data: UserData }) {
       screen = <AccountsScreen accounts={accounts} txs={txs} getCat={getCat} nav={nav} onAddAccount={onAddAccount} onTransfer={onTransfer} onUpdateAccount={onUpdateAccount} />;
       break;
     case "iou":
-      screen = <IouScreen ious={data.ious} nav={nav} />;
+      screen = <IouScreen ious={ious} onAddIou={onAddIou} nav={nav} />;
       break;
     case "categories":
       screen = <CategoriesScreen categories={data.categories} nav={nav} />;

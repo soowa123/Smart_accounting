@@ -44,9 +44,10 @@ export function buildUpcoming(
 }
 
 // Aggregate transactions into the last `count` months of income/expense totals.
+// Fix #2: exclude transfer transactions so they don't inflate both income and expense.
 export function buildMonthly(txs: Tx[], count = 6): Monthly[] {
   const byMonth = new Map<string, { income: number; expense: number }>();
-  txs.forEach((t) => {
+  txs.filter((t) => !t.tags.includes("transfer")).forEach((t) => {
     const ym = t.date.slice(0, 7);
     const cur = byMonth.get(ym) || { income: 0, expense: 0 };
     if (t.amount > 0) cur.income += t.amount;

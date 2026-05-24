@@ -45,8 +45,9 @@ export function HomeScreen({
   const [showBills, setShowBills] = useState(false);
 
   const totalBalance = accounts.reduce((s, a) => s + a.balance, 0);
-  const monthIncome = txs.filter((t) => t.amount > 0 && t.date.startsWith(monthKey)).reduce((s, t) => s + t.amount, 0);
-  const monthExpense = txs.filter((t) => t.amount < 0 && t.date.startsWith(monthKey)).reduce((s, t) => s + t.amount, 0);
+  // Fix #2: exclude transfer transactions from income/expense totals
+  const monthIncome = txs.filter((t) => t.amount > 0 && t.date.startsWith(monthKey) && !t.tags.includes("transfer")).reduce((s, t) => s + t.amount, 0);
+  const monthExpense = txs.filter((t) => t.amount < 0 && t.date.startsWith(monthKey) && !t.tags.includes("transfer")).reduce((s, t) => s + t.amount, 0);
   const upcoming7 = upcoming.slice(0, 4);
   const upcomingSum = upcoming.reduce((s, b) => s + b.amount, 0);
   const recent = txs.filter((t) => !t.tags.includes("transfer")).slice(0, 5);

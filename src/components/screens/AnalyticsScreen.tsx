@@ -124,26 +124,36 @@ export function AnalyticsScreen({
         </>
       )}
 
-      {/* Forecast / Cash flow */}
-      <SectionHeader title="คาดการณ์ Cash Flow" />
-      <div style={{ padding: "0 20px 20px" }}>
-        <Card padding={16}>
-          <div style={{ display: "flex", gap: 12 }}>
-            <div style={{ flex: 1, padding: 12, borderRadius: 14, background: THEME.incomeSoft }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: THEME.income, textTransform: "uppercase", letterSpacing: 0.3 }}>คาดรายรับเดือนหน้า</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: THEME.income, marginTop: 2, fontFamily: MONO }}>{fmt(82500)}</div>
+      {/* Fix #5: Forecast computed from real monthly averages (last 3 months) */}
+      {monthly.length > 0 && (() => {
+        const last3 = monthly.slice(-3);
+        const avgIncome = Math.round(last3.reduce((s, m) => s + m.income, 0) / last3.length);
+        const avgExpense = Math.round(last3.reduce((s, m) => s + m.expense, 0) / last3.length);
+        const net = avgIncome - avgExpense;
+        return (
+          <>
+            <SectionHeader title="คาดการณ์ Cash Flow (เฉลี่ย 3 เดือน)" />
+            <div style={{ padding: "0 20px 20px" }}>
+              <Card padding={16}>
+                <div style={{ display: "flex", gap: 12 }}>
+                  <div style={{ flex: 1, padding: 12, borderRadius: 14, background: THEME.incomeSoft }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: THEME.income, textTransform: "uppercase", letterSpacing: 0.3 }}>คาดรายรับเดือนหน้า</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: THEME.income, marginTop: 2, fontFamily: MONO }}>{fmt(avgIncome)}</div>
+                  </div>
+                  <div style={{ flex: 1, padding: 12, borderRadius: 14, background: THEME.expenseSoft }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: THEME.expense, textTransform: "uppercase", letterSpacing: 0.3 }}>คาดรายจ่าย</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: THEME.expense, marginTop: 2, fontFamily: MONO }}>{fmt(avgExpense)}</div>
+                  </div>
+                </div>
+                <div style={{ marginTop: 12, padding: 14, borderRadius: 14, background: `linear-gradient(135deg, ${THEME.primary}, ${THEME.pink})`, color: "#fff" }}>
+                  <div style={{ fontSize: 11, opacity: 0.85, fontWeight: 600 }}>คาดเงินคงเหลือ ปลายเดือนหน้า</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, marginTop: 2, fontFamily: MONO }}>{net >= 0 ? "+" : ""}{fmt(net)}</div>
+                </div>
+              </Card>
             </div>
-            <div style={{ flex: 1, padding: 12, borderRadius: 14, background: THEME.expenseSoft }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: THEME.expense, textTransform: "uppercase", letterSpacing: 0.3 }}>คาดรายจ่าย</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: THEME.expense, marginTop: 2, fontFamily: MONO }}>{fmt(53200)}</div>
-            </div>
-          </div>
-          <div style={{ marginTop: 12, padding: 14, borderRadius: 14, background: `linear-gradient(135deg, ${THEME.primary}, ${THEME.pink})`, color: "#fff" }}>
-            <div style={{ fontSize: 11, opacity: 0.85, fontWeight: 600 }}>คาดเงินคงเหลือ ปลายเดือนหน้า</div>
-            <div style={{ fontSize: 22, fontWeight: 800, marginTop: 2, fontFamily: MONO }}>+{fmt(29300)}</div>
-          </div>
-        </Card>
-      </div>
+          </>
+        );
+      })()}
     </div>
   );
 }
