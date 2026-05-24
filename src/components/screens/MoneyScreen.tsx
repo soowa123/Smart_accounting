@@ -87,6 +87,15 @@ function Field({
   );
 }
 
+function ModalHeader({ title, onClose }: { title: string; onClose: () => void }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+      <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text }}>{title}</div>
+      <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: THEME.textSec, lineHeight: 1, padding: 4 }}>✕</button>
+    </div>
+  );
+}
+
 function AccountSelect({
   accounts,
   value,
@@ -197,9 +206,7 @@ function PayCardModal({
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text, marginBottom: 18 }}>
-          {payFull ? "จ่ายเต็มจำนวน" : "จ่ายขั้นต่ำ"} — {card.name}
-        </div>
+        <ModalHeader title={`${payFull ? "จ่ายเต็มจำนวน" : "จ่ายขั้นต่ำ"} — ${card.name}`} onClose={onClose} />
         <div style={{ fontSize: 22, fontWeight: 800, color: THEME.text, fontFamily: MONO, marginBottom: 18 }}>
           ฿{fmt(amount)}
         </div>
@@ -257,9 +264,7 @@ function PayCardCustomModal({
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text, marginBottom: 4 }}>
-          💡 จ่ายตามใจ — {card.name}
-        </div>
+        <ModalHeader title={`💡 จ่ายตามใจ — ${card.name}`} onClose={onClose} />
         <div style={{ fontSize: 12, color: THEME.textSec, marginBottom: 18 }}>
           ยอดเต็ม ฿{fmt(card.fullPay)} · ขั้นต่ำ ฿{fmt(card.minPay)}
         </div>
@@ -332,9 +337,7 @@ function PayLoanCustomModal({
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text, marginBottom: 4 }}>
-          💡 จ่ายตามใจ — {loan.label}
-        </div>
+        <ModalHeader title={`💡 จ่ายตามใจ — ${loan.label}`} onClose={onClose} />
         <div style={{ fontSize: 12, color: THEME.textSec, marginBottom: 18 }}>
           ค่างวดปกติ ฿{fmt(loan.monthly)} · ยอดคงเหลือ ฿{fmt(loan.remaining)}
         </div>
@@ -406,7 +409,7 @@ function EditSubscriptionModal({
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text, marginBottom: 18 }}>✏️ แก้ไข Subscription</div>
+        <ModalHeader title="✏️ แก้ไข Subscription" onClose={onClose} />
         <Field label="ชื่อ"><input style={inputStyle} value={label} onChange={(e) => setLabel(e.target.value)} /></Field>
         <Field label="ไอคอน (Emoji)"><input style={inputStyle} value={icon} onChange={(e) => setIcon(e.target.value)} /></Field>
         <Field label="ราคา (บาท)"><input style={inputStyle} type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
@@ -482,7 +485,7 @@ function AddCardModal({
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text, marginBottom: 18 }}>+ เพิ่มบัตรเครดิต</div>
+        <ModalHeader title="+ เพิ่มบัตรเครดิต" onClose={onClose} />
         <Field label="ชื่อบัตร"><input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="เช่น Gold Card" /></Field>
         <Field label="ธนาคาร"><input style={inputStyle} value={bank} onChange={(e) => setBank(e.target.value)} placeholder="เช่น KBANK" /></Field>
         <Field label="เลข 4 หลักท้าย"><input style={inputStyle} value={last4} onChange={(e) => setLast4(e.target.value)} placeholder="1234" maxLength={4} /></Field>
@@ -684,9 +687,7 @@ function AmortizationModal({ loan, onClose }: { loan: Loan; onClose: () => void 
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={{ ...sheetStyle, maxHeight: "80vh" }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text, marginBottom: 18 }}>
-          ตารางผ่อนชำระ — {loan.label}
-        </div>
+        <ModalHeader title={`ตารางผ่อนชำระ — ${loan.label}`} onClose={onClose} />
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: MONO }}>
             <thead>
@@ -745,9 +746,7 @@ function PayLoanModal({
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text, marginBottom: 18 }}>
-          บันทึกจ่ายงวด — {loan.label}
-        </div>
+        <ModalHeader title={`บันทึกจ่ายงวด — ${loan.label}`} onClose={onClose} />
         <div style={{ fontSize: 22, fontWeight: 800, color: THEME.text, fontFamily: MONO, marginBottom: 18 }}>
           ฿{fmt(loan.monthly)} / เดือน
         </div>
@@ -824,7 +823,7 @@ function AddLoanModal({
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text, marginBottom: 18 }}>+ เพิ่มสัญญาผ่อน</div>
+        <ModalHeader title="+ เพิ่มสัญญาผ่อน" onClose={onClose} />
         <Field label="ชื่อ"><input style={inputStyle} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="เช่น ผ่อนรถ Honda" /></Field>
         <Field label="ไอคอน (Emoji)"><input style={inputStyle} value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="🚗" /></Field>
         <Field label="ประเภท">
@@ -994,9 +993,7 @@ function PayInstModal({
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text, marginBottom: 18 }}>
-          บันทึกงวด — {inst.label}
-        </div>
+        <ModalHeader title={`บันทึกงวด — ${inst.label}`} onClose={onClose} />
         <div style={{ fontSize: 22, fontWeight: 800, color: THEME.text, fontFamily: MONO, marginBottom: 18 }}>
           ฿{fmt(inst.monthly)} / เดือน
         </div>
@@ -1063,7 +1060,7 @@ function AddInstallmentModal({
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text, marginBottom: 18 }}>+ เพิ่มรายการผ่อน</div>
+        <ModalHeader title="+ เพิ่มรายการผ่อน" onClose={onClose} />
         <Field label="ชื่อสินค้า"><input style={inputStyle} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="เช่น iPhone 15" /></Field>
         <Field label="ไอคอน (Emoji)"><input style={inputStyle} value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="📱" /></Field>
         <Field label="ร้าน"><input style={inputStyle} value={shop} onChange={(e) => setShop(e.target.value)} placeholder="เช่น Apple Store" /></Field>
@@ -1221,7 +1218,7 @@ function AddSubscriptionModal({
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
-        <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text, marginBottom: 18 }}>+ เพิ่ม Subscription</div>
+        <ModalHeader title="+ เพิ่ม Subscription" onClose={onClose} />
         <Field label="ชื่อ"><input style={inputStyle} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="เช่น Netflix" /></Field>
         <Field label="ไอคอน (Emoji)"><input style={inputStyle} value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="🎬" /></Field>
         <Field label="ราคา (บาท)"><input style={inputStyle} type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>

@@ -63,10 +63,12 @@ export function AccountsScreen({
 }) {
   const total = accounts.reduce((s, a) => s + a.balance, 0);
 
+  // ── Global account-number visibility ──────────────────────────
+  const [showNumbers, setShowNumbers] = useState(false);
+
   // ── Detail state ──────────────────────────────────────────────
   const [detailKey, setDetailKey] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<"info" | "history">("info");
-  const [showAccNum, setShowAccNum] = useState(false);
   const detailAcc = accounts.find((a) => a.key === detailKey) ?? null;
 
   // Edit fields
@@ -81,7 +83,6 @@ export function AccountsScreen({
   const openDetail = (a: Account) => {
     setDetailKey(a.key);
     setDetailTab("info");
-    setShowAccNum(false);
     setELabel(a.label); setEShort(a.short);
     setEBalance(String(a.balance)); setEAccNum(a.accountNumber ?? "");
     setEColor(a.color); setEEmoji(a.emoji);
@@ -183,14 +184,16 @@ export function AccountsScreen({
                 <div style={{ fontSize: 26, fontWeight: 800, color: "#fff", fontFamily: MONO }}>{fmt(detailAcc.balance)}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
                   <div style={{ fontSize: 12, color: "#fff", opacity: 0.85, fontFamily: MONO }}>
-                    {detailAcc.accountNumber ? maskAccNum(detailAcc.accountNumber, showAccNum) : `•••• ${detailAcc.short}`}
+                    {detailAcc.accountNumber ? maskAccNum(detailAcc.accountNumber, showNumbers) : `•••• ${detailAcc.short}`}
+                    {" · "}
+                    {detailAcc.short}
                   </div>
                   {detailAcc.accountNumber && (
                     <button
-                      onClick={() => setShowAccNum((v) => !v)}
+                      onClick={() => setShowNumbers((v) => !v)}
                       style={{ background: "rgba(255,255,255,0.2)", border: "none", borderRadius: 6, padding: "2px 6px", cursor: "pointer", fontSize: 10, color: "#fff", fontWeight: 700 }}
                     >
-                      {showAccNum ? "ซ่อน" : "แสดง"}
+                      {showNumbers ? "ซ่อน" : "แสดง"}
                     </button>
                   )}
                 </div>
@@ -283,9 +286,30 @@ export function AccountsScreen({
       <ScreenHeader title="บัญชีของฉัน" subtitle="Accounts & Wallets" nav={nav} />
       <div style={{ padding: "0 20px" }}>
         <Card padding={16} style={{ background: `linear-gradient(135deg, ${THEME.income}, ${THEME.primary})`, color: "#fff" }}>
-          <div style={{ fontSize: 11, opacity: 0.85, fontWeight: 600 }}>ยอดรวมทุกบัญชี</div>
-          <div style={{ fontSize: 28, fontWeight: 800, marginTop: 4, fontFamily: MONO }}>{fmt(total)}</div>
-          <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{accounts.length} บัญชี</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ fontSize: 11, opacity: 0.85, fontWeight: 600 }}>ยอดรวมทุกบัญชี</div>
+              <div style={{ fontSize: 28, fontWeight: 800, marginTop: 4, fontFamily: MONO }}>{fmt(total)}</div>
+              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{accounts.length} บัญชี</div>
+            </div>
+            <button
+              onClick={() => setShowNumbers((v) => !v)}
+              style={{
+                background: "rgba(255,255,255,0.22)",
+                border: "none",
+                borderRadius: 10,
+                padding: "8px 14px",
+                cursor: "pointer",
+                fontSize: 11,
+                color: "#fff",
+                fontWeight: 700,
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              }}
+            >
+              {showNumbers ? "🙈 ซ่อน" : "👁 แสดง"}
+            </button>
+          </div>
         </Card>
       </div>
 
@@ -299,8 +323,14 @@ export function AccountsScreen({
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14.5, fontWeight: 700, color: THEME.text }}>{a.label}</div>
-                  <div style={{ fontSize: 11, color: THEME.textSec, marginTop: 1, fontFamily: MONO }}>
-                    {a.accountNumber ? `•••• ${a.accountNumber.slice(-4)}` : `•••• ${a.short}`}
+                  <div style={{ fontSize: 11, color: THEME.textSec, marginTop: 1, fontFamily: MONO, display: "flex", alignItems: "center", gap: 5 }}>
+                    {a.accountNumber ? (
+                      <span>{showNumbers ? a.accountNumber : `•••• ${a.accountNumber.slice(-4)}`}</span>
+                    ) : (
+                      <span>••••</span>
+                    )}
+                    <span style={{ opacity: 0.4 }}>·</span>
+                    <span>{a.short}</span>
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
