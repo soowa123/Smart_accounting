@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { UserData } from "@/lib/data";
-import type { Category, Tx, Goal, Iou, Widgets, Account, Card as CardT, Loan, Installment, Subscription } from "@/lib/types";
+import type { Category, Tx, Goal, Iou, Budget, Widgets, Account, Card as CardT, Loan, Installment, Subscription } from "@/lib/types";
 import { buildUpcoming, buildMonthly } from "@/lib/derive";
 import { todayISO, currentMonthKey } from "@/lib/money";
 import { TabBar } from "@/components/TabBar";
@@ -13,8 +13,10 @@ import {
   addCard, deleteCard, payCard, payCardAmount,
   addLoan, deleteLoan, recordLoanPayment, payLoanAmount,
   addInstallment, deleteInstallment, recordInstPayment,
-  addSubscription, deleteSubscription, updateSubscription,
-  addIou, addGoal,
+  addSubscription, deleteSubscription, updateSubscription, paySubscription,
+  addIou, deleteIou,
+  addGoal, withdrawGoal, deleteGoal,
+  setBudget, deleteBudget,
 } from "@/app/(app)/actions";
 
 import { HomeScreen } from "@/components/screens/HomeScreen";
@@ -41,6 +43,7 @@ export function AppShell({ data }: { data: UserData }) {
   const [txs, setTxs] = useState<Tx[]>(data.txs);
   const [goals, setGoals] = useState<Goal[]>(data.goals);
   const [ious, setIous] = useState<Iou[]>(data.ious);
+  const [budgetsAll, setBudgetsAll] = useState<Budget[]>(data.budgets);
   const [widgets, setWidgets] = useState<Widgets>(data.widgets);
   const [accounts, setAccounts] = useState<Account[]>(data.accounts);
   const [cards, setCards] = useState<CardT[]>(data.cards);
@@ -76,7 +79,7 @@ export function AppShell({ data }: { data: UserData }) {
   );
   const monthly = useMemo(() => buildMonthly(txs), [txs]);
   const monthKey = currentMonthKey();
-  const budgets = useMemo(() => data.budgets.filter((b) => b.month === monthKey), [data.budgets, monthKey]);
+  const budgets = useMemo(() => budgetsAll.filter((b) => b.month === monthKey), [budgetsAll, monthKey]);
 
   const nav: NavFn = (where) => {
     if (MONEY_TABS.includes(where)) {
@@ -90,15 +93,43 @@ export function AppShell({ data }: { data: UserData }) {
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   };
 
-  const onAdd = async (draft: TxDraft) => {
-    const created = await addTransaction(draft);
-    setTxs((prev) => [created, ...prev]);
+  const handleError = (e: unknown) => {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg === "INSUFFICIENT_BALANCE") alert("⚠️ ยอดในบัญชีไม่เพียงพอ");
+    else if (msg === "SYSTEM_TX") alert("ไม่สามารถลบรายการอัตโนมัติได้");
+    else if (msg === "NOTHING_TO_PAY") alert("ไม่มียอดที่ต้องจ่าย");
+    else if (msg === "INSUFFICIENT_SAVED") alert("⚠️ ยอดที่ออมไว้ไม่เพียงพอ");
+    else if (msg === "ALREADY_FULLY_PAID") alert("ชำระครบทุกงวดแล้ว");
+    else { console.error(e); alert("เกิดข้อผิดพลาด กรุณาลองใหม่"); }
   };
 
+  const onAdd = async (draft: TxDraft) => {
+    try {
+      const created = await addTransaction(draft);
+      setTxs((prev) => [created, ...prev]);
+      // Fix Bug A: update account balance in local state
+      setAccounts((prev) => prev.map((a) =>
+        a.key === draft.accountKey ? { ...a, balance: a.balance + draft.amount } : a
+      ));
+    } catch (e) { handleError(e); }
+  };
+
+  const SYSTEM_TAGS = ["card-payment", "loan-payment", "inst-payment", "sub-payment", "transfer"];
   const onDelete = async (tx: Tx) => {
+    // Fix Bug L: block deletion of system-generated transactions
+    if (SYSTEM_TAGS.some((t) => tx.tags.includes(t))) {
+      alert("ไม่สามารถลบรายการอัตโนมัติได้");
+      return;
+    }
     if (!window.confirm(`ลบรายการ "${tx.label}" ?`)) return;
-    setTxs((prev) => prev.filter((x) => x.id !== tx.id));
-    await deleteTransaction(tx.id);
+    try {
+      setTxs((prev) => prev.filter((x) => x.id !== tx.id));
+      // Fix Bug B: restore account balance in local state
+      setAccounts((prev) => prev.map((a) =>
+        a.key === tx.accountKey ? { ...a, balance: a.balance - tx.amount } : a
+      ));
+      await deleteTransaction(tx.id);
+    } catch (e) { handleError(e); }
   };
 
   const onToggleWidget = async (key: keyof Widgets, value: boolean) => {
@@ -107,8 +138,23 @@ export function AppShell({ data }: { data: UserData }) {
   };
 
   const onDepositGoal = async (key: string, amount: number) => {
-    const saved = await depositGoal(key, amount);
-    setGoals((prev) => prev.map((g) => (g.key === key ? { ...g, saved } : g)));
+    try {
+      const saved = await depositGoal(key, amount);
+      setGoals((prev) => prev.map((g) => (g.key === key ? { ...g, saved } : g)));
+    } catch (e) { handleError(e); }
+  };
+
+  const onWithdrawGoal = async (key: string, amount: number) => {
+    try {
+      const saved = await withdrawGoal(key, amount);
+      setGoals((prev) => prev.map((g) => (g.key === key ? { ...g, saved } : g)));
+    } catch (e) { handleError(e); }
+  };
+
+  const onDeleteGoal = async (key: string) => {
+    if (!window.confirm("ลบเป้าหมายนี้?")) return;
+    await deleteGoal(key);
+    setGoals((prev) => prev.filter((g) => g.key !== key));
   };
 
   const onAddGoal = async (draft: Omit<Goal, "key">) => {
@@ -119,6 +165,28 @@ export function AppShell({ data }: { data: UserData }) {
   const onAddIou = async (draft: { name: string; type: string; amount: number; note: string; date: string }) => {
     const created = await addIou(draft);
     setIous((prev) => [created, ...prev]);
+  };
+
+  const onDeleteIou = async (id: string) => {
+    if (!window.confirm("ลบรายการยืมนี้?")) return;
+    await deleteIou(id);
+    setIous((prev) => prev.filter((i) => i.id !== id));
+  };
+
+  const onSetBudget = async (categoryKey: string, planned: number) => {
+    await setBudget(categoryKey, planned);
+    const month = monthKey;
+    setBudgetsAll((prev) => {
+      const idx = prev.findIndex((b) => b.categoryKey === categoryKey && b.month === month);
+      if (idx >= 0) return prev.map((b, i) => i === idx ? { ...b, planned } : b);
+      return [...prev, { categoryKey, month, planned, spent: 0 }];
+    });
+  };
+
+  const onDeleteBudget = async (categoryKey: string) => {
+    if (!window.confirm("ลบงบประมาณหมวดนี้?")) return;
+    await deleteBudget(categoryKey);
+    setBudgetsAll((prev) => prev.filter((b) => !(b.categoryKey === categoryKey && b.month === monthKey)));
   };
 
   const onAddAccount = async (draft: Omit<Account, "key">) => {
@@ -141,17 +209,21 @@ export function AppShell({ data }: { data: UserData }) {
   };
 
   const onPayCard = async (key: string, payFull: boolean, accountKey: string) => {
-    const { card, tx } = await payCard(key, payFull, accountKey);
-    setCards((prev) => prev.map((c) => (c.key === key ? card : c)));
-    setTxs((prev) => [tx, ...prev]);
-    setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
+    try {
+      const { card, tx } = await payCard(key, payFull, accountKey);
+      setCards((prev) => prev.map((c) => (c.key === key ? card : c)));
+      setTxs((prev) => [tx, ...prev]);
+      setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
+    } catch (e) { handleError(e); }
   };
 
   const onPayCardAmount = async (key: string, amount: number, accountKey: string) => {
-    const { card, tx } = await payCardAmount(key, amount, accountKey);
-    setCards((prev) => prev.map((c) => (c.key === key ? card : c)));
-    setTxs((prev) => [tx, ...prev]);
-    setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
+    try {
+      const { card, tx } = await payCardAmount(key, amount, accountKey);
+      setCards((prev) => prev.map((c) => (c.key === key ? card : c)));
+      setTxs((prev) => [tx, ...prev]);
+      setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
+    } catch (e) { handleError(e); }
   };
 
   const onAddCard = async (draft: Omit<CardT, "key">) => {
@@ -165,17 +237,21 @@ export function AppShell({ data }: { data: UserData }) {
   };
 
   const onRecordLoanPayment = async (key: string, accountKey: string) => {
-    const { loan, tx } = await recordLoanPayment(key, accountKey);
-    setLoans((prev) => prev.map((l) => (l.key === key ? loan : l)));
-    setTxs((prev) => [tx, ...prev]);
-    setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
+    try {
+      const { loan, tx } = await recordLoanPayment(key, accountKey);
+      setLoans((prev) => prev.map((l) => (l.key === key ? loan : l)));
+      setTxs((prev) => [tx, ...prev]);
+      setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
+    } catch (e) { handleError(e); }
   };
 
   const onPayLoanAmount = async (key: string, amount: number, accountKey: string) => {
-    const { loan, tx } = await payLoanAmount(key, amount, accountKey);
-    setLoans((prev) => prev.map((l) => (l.key === key ? loan : l)));
-    setTxs((prev) => [tx, ...prev]);
-    setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
+    try {
+      const { loan, tx } = await payLoanAmount(key, amount, accountKey);
+      setLoans((prev) => prev.map((l) => (l.key === key ? loan : l)));
+      setTxs((prev) => [tx, ...prev]);
+      setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
+    } catch (e) { handleError(e); }
   };
 
   const onAddLoan = async (draft: Omit<Loan, "key">) => {
@@ -189,10 +265,21 @@ export function AppShell({ data }: { data: UserData }) {
   };
 
   const onRecordInstPayment = async (key: string, accountKey: string) => {
-    const { inst, tx } = await recordInstPayment(key, accountKey);
-    setInstallments((prev) => prev.map((i) => (i.key === key ? inst : i)));
-    setTxs((prev) => [tx, ...prev]);
-    setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
+    try {
+      const { inst, tx } = await recordInstPayment(key, accountKey);
+      setInstallments((prev) => prev.map((i) => (i.key === key ? inst : i)));
+      setTxs((prev) => [tx, ...prev]);
+      setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
+    } catch (e) { handleError(e); }
+  };
+
+  const onPaySubscription = async (key: string, accountKey: string) => {
+    try {
+      const { sub, tx } = await paySubscription(key, accountKey);
+      setSubscriptions((prev) => prev.map((s) => (s.key === key ? sub : s)));
+      setTxs((prev) => [tx, ...prev]);
+      setAccounts((prev) => prev.map((a) => a.key === accountKey ? { ...a, balance: a.balance + tx.amount } : a));
+    } catch (e) { handleError(e); }
   };
 
   const onAddInstallment = async (draft: Omit<Installment, "key">) => {
@@ -224,7 +311,7 @@ export function AppShell({ data }: { data: UserData }) {
     onPayCard, onPayCardAmount, onAddCard, onDeleteCard,
     onRecordLoanPayment, onPayLoanAmount, onAddLoan, onDeleteLoan,
     onRecordInstPayment, onAddInstallment, onDeleteInstallment,
-    onAddSubscription, onDeleteSubscription, onUpdateSubscription,
+    onAddSubscription, onDeleteSubscription, onUpdateSubscription, onPaySubscription,
   };
 
   let screen: React.ReactNode;
@@ -266,10 +353,10 @@ export function AppShell({ data }: { data: UserData }) {
       screen = <MoreScreen nav={nav} />;
       break;
     case "budget":
-      screen = <BudgetScreen budgets={budgets} getCat={getCat} nav={nav} />;
+      screen = <BudgetScreen budgets={budgets} getCat={getCat} categories={data.categories} onSetBudget={onSetBudget} onDeleteBudget={onDeleteBudget} nav={nav} />;
       break;
     case "goals":
-      screen = <GoalsScreen goals={goals} onDeposit={onDepositGoal} onAddGoal={onAddGoal} nav={nav} />;
+      screen = <GoalsScreen goals={goals} onDeposit={onDepositGoal} onWithdrawGoal={onWithdrawGoal} onDeleteGoal={onDeleteGoal} onAddGoal={onAddGoal} nav={nav} />;
       break;
     case "analytics":
       screen = (
@@ -283,7 +370,7 @@ export function AppShell({ data }: { data: UserData }) {
       screen = <AccountsScreen accounts={accounts} txs={txs} getCat={getCat} nav={nav} onAddAccount={onAddAccount} onTransfer={onTransfer} onUpdateAccount={onUpdateAccount} />;
       break;
     case "iou":
-      screen = <IouScreen ious={ious} onAddIou={onAddIou} nav={nav} />;
+      screen = <IouScreen ious={ious} onAddIou={onAddIou} onDeleteIou={onDeleteIou} nav={nav} />;
       break;
     case "categories":
       screen = <CategoriesScreen categories={data.categories} nav={nav} />;
@@ -307,6 +394,7 @@ export function AppShell({ data }: { data: UserData }) {
         open={adding}
         onClose={() => setAdding(false)}
         onAdd={onAdd}
+        onTransfer={onTransfer}
         categories={data.categories}
         accounts={accounts}
       />

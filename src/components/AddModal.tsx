@@ -24,12 +24,14 @@ export function AddModal({
   open,
   onClose,
   onAdd,
+  onTransfer,
   categories,
   accounts,
 }: {
   open: boolean;
   onClose: () => void;
   onAdd: (draft: TxDraft) => void;
+  onTransfer?: (from: string, to: string, amount: number) => Promise<void>;
   categories: Category[];
   accounts: Account[];
 }) {
@@ -38,6 +40,7 @@ export function AddModal({
   const [catId, setCatId] = useState("");
   const [label, setLabel] = useState("");
   const [account, setAccount] = useState("");
+  const [toAccount, setToAccount] = useState("");
 
   const cats = useMemo(() => {
     if (kind === "income") return categories.filter((c) => c.kind === "income" || c.kind === "both");
@@ -50,6 +53,7 @@ export function AddModal({
       setAmount("");
       setLabel("");
       setAccount(accounts[0]?.key ?? "");
+      setToAccount(accounts[1]?.key ?? accounts[0]?.key ?? "");
     }
   }, [open, accounts]);
 
@@ -60,9 +64,23 @@ export function AddModal({
 
   if (!open) return null;
 
-  const submit = () => {
+  const [transferring, setTransferring] = useState(false);
+
+  const submit = async () => {
     const n = parseFloat(amount.replace(/,/g, ""));
-    if (!n || !label || !catId || !account) return;
+    if (!n) return;
+
+    if (kind === "transfer") {
+      if (!account || !toAccount || account === toAccount || !onTransfer) return;
+      setTransferring(true);
+      try {
+        await onTransfer(account, toAccount, n);
+        onClose();
+      } finally { setTransferring(false); }
+      return;
+    }
+
+    if (!label || !catId || !account) return;
     onAdd({
       date: todayISO(),
       time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }),
@@ -213,7 +231,7 @@ export function AddModal({
         {/* account picker */}
         <div style={{ padding: "14px 20px 0" }}>
           <div style={{ fontSize: 11, color: THEME.textSec, fontWeight: 700, marginBottom: 8, letterSpacing: 0.3, textTransform: "uppercase" }}>
-            บัญชี
+            {kind === "transfer" ? "จากบัญชี" : "บัญชี"}
           </div>
           <div className="no-scrollbar" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
             {accounts.map((a) => (
@@ -242,9 +260,49 @@ export function AddModal({
           </div>
         </div>
 
+        {/* To-account picker — only shown for transfer */}
+        {kind === "transfer" && (
+          <div style={{ padding: "14px 20px 0" }}>
+            <div style={{ fontSize: 11, color: THEME.textSec, fontWeight: 700, marginBottom: 8, letterSpacing: 0.3, textTransform: "uppercase" }}>
+              ไปบัญชี
+            </div>
+            <div className="no-scrollbar" style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+              {accounts.map((a) => (
+                <button
+                  key={a.key}
+                  onClick={() => setToAccount(a.key)}
+                  style={{
+                    flexShrink: 0,
+                    padding: "8px 14px",
+                    borderRadius: 12,
+                    border: toAccount === a.key ? `2px solid ${THEME.income}` : "2px solid transparent",
+                    background: THEME.surface,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    color: THEME.text,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                    opacity: a.key === account ? 0.35 : 1,
+                  }}
+                >
+                  <span>{a.emoji}</span> {a.short}
+                </button>
+              ))}
+            </div>
+            {account === toAccount && (
+              <div style={{ fontSize: 11, color: THEME.expense, fontWeight: 600, marginTop: 6 }}>
+                ⚠️ ต้องเลือกบัญชีต่างกัน
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={{ padding: "18px 20px 0" }}>
-          <PrimaryButton full onClick={submit}>
-            บันทึกรายการ
+          <PrimaryButton full onClick={submit} disabled={transferring}>
+            {transferring ? "กำลังโอน..." : kind === "transfer" ? "ยืนยันโอนเงิน" : "บันทึกรายการ"}
           </PrimaryButton>
         </div>
       </div>

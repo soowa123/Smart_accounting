@@ -29,10 +29,12 @@ const fieldLabel: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: 
 export function IouScreen({
   ious,
   onAddIou,
+  onDeleteIou,
   nav,
 }: {
   ious: Iou[];
   onAddIou?: (draft: { name: string; type: string; amount: number; note: string; date: string }) => Promise<void>;
+  onDeleteIou?: (id: string) => Promise<void>;
   nav: NavFn;
 }) {
   const owe = ious.filter((i) => i.type === "owe").reduce((s, i) => s + i.amount, 0);
@@ -88,6 +90,14 @@ export function IouScreen({
                     {isOwe ? "-" : "+"}{fmt(i.amount)}
                   </div>
                   <div style={{ fontSize: 10, color: THEME.textMuted, marginTop: 1 }}>{i.date.slice(5)}</div>
+                  {onDeleteIou && (
+                    <button
+                      onClick={() => onDeleteIou(i.id)}
+                      style={{ marginTop: 4, background: "rgba(239,68,68,0.12)", border: "none", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontSize: 11, color: THEME.expense, fontWeight: 700 }}
+                    >
+                      ✓ เคลียร์
+                    </button>
+                  )}
                 </div>
               </div>
             </Card>

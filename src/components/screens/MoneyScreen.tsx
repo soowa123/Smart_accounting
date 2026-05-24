@@ -24,6 +24,7 @@ type MoneyHandlers = {
   onAddSubscription: (draft: Omit<Subscription, "key">) => Promise<void>;
   onDeleteSubscription: (key: string) => Promise<void>;
   onUpdateSubscription: (key: string, data: Omit<Subscription, "key">) => Promise<void>;
+  onPaySubscription: (key: string, accountKey: string) => Promise<void>;
 };
 
 const addBtnStyle: React.CSSProperties = {
@@ -1248,17 +1249,74 @@ function AddSubscriptionModal({
 }
 
 // ────────────────────────────────────────────────────────────────────────────────
+// PaySub Modal
+// ────────────────────────────────────────────────────────────────────────────────
+function PaySubModal({
+  sub,
+  accounts,
+  onClose,
+  onPay,
+}: {
+  sub: Subscription;
+  accounts: Account[];
+  onClose: () => void;
+  onPay: (accountKey: string) => Promise<void>;
+}) {
+  const [accountKey, setAccountKey] = useState(accounts[0]?.key ?? "");
+  const [busy, setBusy] = useState(false);
+
+  const handlePay = async () => {
+    if (!accountKey) return;
+    setBusy(true);
+    try {
+      await onPay(accountKey);
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
+        <ModalHeader title={`บันทึกจ่าย — ${sub.label}`} onClose={onClose} />
+        <div style={{ fontSize: 22, fontWeight: 800, color: THEME.text, fontFamily: MONO, marginBottom: 18 }}>
+          ฿{fmt(sub.amount)} / {sub.cycle === "yearly" ? "ปี" : "เดือน"}
+        </div>
+        <Field label="ตัดจากบัญชี">
+          <AccountSelect accounts={accounts} value={accountKey} onChange={setAccountKey} />
+        </Field>
+        <button
+          disabled={!accountKey || busy}
+          onClick={handlePay}
+          style={{
+            width: "100%", padding: "14px", borderRadius: 14, border: "none",
+            background: sub.color, color: "#fff", fontWeight: 800, fontSize: 15, cursor: "pointer",
+            opacity: !accountKey || busy ? 0.5 : 1,
+          }}
+        >
+          {busy ? "กำลังบันทึก..." : `ยืนยันจ่าย ${fmt(sub.amount)}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
 // SubsView
 // ────────────────────────────────────────────────────────────────────────────────
 function SubsView({
   subs,
+  accounts,
   handlers,
 }: {
   subs: Subscription[];
+  accounts: Account[];
   handlers: MoneyHandlers;
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [editSub, setEditSub] = useState<Subscription | null>(null);
+  const [paySub, setPaySub] = useState<Subscription | null>(null);
   const total = subs.reduce((s, x) => s + x.amount, 0);
 
   const handleDelete = (s: Subscription) => {
@@ -1299,6 +1357,11 @@ function SubsView({
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, color: THEME.income, fontWeight: 700 }}>● Active</div>
                 <div style={{ display: "flex", gap: 4 }}>
                   <button
+                    onClick={() => setPaySub(s)}
+                    style={{ background: s.color + "20", border: "none", borderRadius: 8, width: 26, height: 26, cursor: "pointer", color: s.color, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}
+                    title="บันทึกจ่าย"
+                  >✓</button>
+                  <button
                     onClick={() => setEditSub(s)}
                     style={{ background: THEME.purpleSoft, border: "none", borderRadius: 8, width: 26, height: 26, cursor: "pointer", color: THEME.purple, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}
                   >✏️</button>
@@ -1320,6 +1383,14 @@ function SubsView({
           sub={editSub}
           onClose={() => setEditSub(null)}
           onSave={(data) => handlers.onUpdateSubscription(editSub.key, data)}
+        />
+      )}
+      {paySub && (
+        <PaySubModal
+          sub={paySub}
+          accounts={accounts}
+          onClose={() => setPaySub(null)}
+          onPay={(accountKey) => handlers.onPaySubscription(paySub.key, accountKey)}
         />
       )}
     </div>
@@ -1366,7 +1437,7 @@ export function MoneyScreen({
         {tab === "cards" && <CardsView cards={cards} accounts={accounts} handlers={handlers} />}
         {tab === "loans" && <LoansView loans={loans} accounts={accounts} handlers={handlers} />}
         {tab === "inst" && <InstallmentsView installments={installments} accounts={accounts} handlers={handlers} />}
-        {tab === "subs" && <SubsView subs={subscriptions} handlers={handlers} />}
+        {tab === "subs" && <SubsView subs={subscriptions} accounts={accounts} handlers={handlers} />}
       </div>
     </div>
   );

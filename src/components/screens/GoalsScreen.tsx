@@ -37,18 +37,27 @@ const addBtnStyle: React.CSSProperties = {
 export function GoalsScreen({
   goals,
   onDeposit,
+  onWithdrawGoal,
+  onDeleteGoal,
   onAddGoal,
   nav,
 }: {
   goals: Goal[];
   onDeposit: (key: string, amount: number) => void | Promise<void>;
+  onWithdrawGoal?: (key: string, amount: number) => Promise<void>;
+  onDeleteGoal?: (key: string) => Promise<void>;
   onAddGoal?: (draft: Omit<Goal, "key">) => Promise<void>;
   nav: NavFn;
 }) {
-  // Fix #9: deposit modal state (replaces window.prompt)
+  // Deposit modal state
   const [depositGoal, setDepositGoal] = useState<Goal | null>(null);
   const [depositAmt, setDepositAmt] = useState("");
   const [depositBusy, setDepositBusy] = useState(false);
+
+  // Withdraw modal state
+  const [withdrawGoalItem, setWithdrawGoalItem] = useState<Goal | null>(null);
+  const [withdrawAmt, setWithdrawAmt] = useState("");
+  const [withdrawBusy, setWithdrawBusy] = useState(false);
 
   const handleDeposit = async () => {
     if (!depositGoal) return;
@@ -61,6 +70,20 @@ export function GoalsScreen({
       setDepositAmt("");
     } finally {
       setDepositBusy(false);
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!withdrawGoalItem || !onWithdrawGoal) return;
+    const n = parseFloat(withdrawAmt);
+    if (!(n > 0)) return;
+    setWithdrawBusy(true);
+    try {
+      await onWithdrawGoal(withdrawGoalItem.key, n);
+      setWithdrawGoalItem(null);
+      setWithdrawAmt("");
+    } finally {
+      setWithdrawBusy(false);
     }
   };
 
@@ -111,9 +134,13 @@ export function GoalsScreen({
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-                {/* Fix #9: open deposit modal instead of window.prompt */}
                 <SoftButton color={g.color} full style={{ flex: 1 }} onClick={() => { setDepositGoal(g); setDepositAmt(""); }}>+ ฝาก</SoftButton>
-                <SoftButton color={THEME.textSec} style={{ background: "rgba(31,27,46,0.06)" }}>รายละเอียด</SoftButton>
+                {onWithdrawGoal && g.saved > 0 && (
+                  <SoftButton color={THEME.warn} style={{ background: "rgba(245,158,11,0.1)" }} onClick={() => { setWithdrawGoalItem(g); setWithdrawAmt(""); }}>ถอน</SoftButton>
+                )}
+                {onDeleteGoal && (
+                  <SoftButton color={THEME.expense} style={{ background: "rgba(239,68,68,0.08)" }} onClick={() => onDeleteGoal(g.key)}>🗑</SoftButton>
+                )}
               </div>
             </Card>
           );
@@ -155,7 +182,37 @@ export function GoalsScreen({
         </div>
       )}
 
-      {/* Fix #11: Add goal modal */}
+      {/* Withdraw modal */}
+      {withdrawGoalItem && (
+        <div style={overlayStyle} onClick={() => setWithdrawGoalItem(null)}>
+          <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text }}>💸 ถอนเงินจากเป้าหมาย</div>
+              <button onClick={() => setWithdrawGoalItem(null)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: THEME.textSec }}>✕</button>
+            </div>
+            <div style={{ fontSize: 13, color: THEME.textSec, marginBottom: 14 }}>
+              {withdrawGoalItem.icon} {withdrawGoalItem.label} · ออมได้ {fmt(withdrawGoalItem.saved)}
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={fieldLabel}>จำนวนที่ต้องการถอน (฿)</div>
+              <input
+                style={inputStyle} type="number" placeholder="เช่น 1,000"
+                value={withdrawAmt} onChange={(e) => setWithdrawAmt(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <button
+              disabled={withdrawBusy || !(parseFloat(withdrawAmt) > 0) || parseFloat(withdrawAmt) > withdrawGoalItem.saved}
+              onClick={handleWithdraw}
+              style={{ width: "100%", padding: 14, borderRadius: 14, border: "none", background: THEME.warn, color: "#fff", fontWeight: 800, fontSize: 15, cursor: "pointer", opacity: withdrawBusy || !(parseFloat(withdrawAmt) > 0) || parseFloat(withdrawAmt) > withdrawGoalItem.saved ? 0.5 : 1 }}
+            >
+              {withdrawBusy ? "กำลังบันทึก..." : `ยืนยันถอน ${parseFloat(withdrawAmt) > 0 ? fmt(parseFloat(withdrawAmt)) : ""}`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add goal modal */}
       {showAdd && (
         <div style={overlayStyle} onClick={() => setShowAdd(false)}>
           <div style={sheetStyle} onClick={(e) => e.stopPropagation()}>
