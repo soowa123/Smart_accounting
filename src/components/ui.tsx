@@ -434,28 +434,33 @@ export function PrimaryButton({
   full,
   style,
   type,
+  disabled,
 }: {
   children: ReactNode;
   onClick?: () => void;
   full?: boolean;
   style?: CSSProperties;
   type?: "button" | "submit";
+  disabled?: boolean;
 }) {
   return (
     <button
       type={type}
       onClick={onClick}
+      disabled={disabled}
       style={{
         padding: "13px 18px",
         borderRadius: 16,
         border: "none",
-        background: `linear-gradient(135deg, ${THEME.primary}, ${THEME.pink})`,
-        color: "#fff",
+        background: disabled
+          ? THEME.border
+          : `linear-gradient(135deg, ${THEME.primary}, ${THEME.pink})`,
+        color: disabled ? THEME.textMuted : "#fff",
         fontWeight: 700,
         fontSize: 15,
-        cursor: "pointer",
+        cursor: disabled ? "not-allowed" : "pointer",
         width: full ? "100%" : undefined,
-        boxShadow: "0 6px 16px -4px rgba(124,58,237,0.45)",
+        boxShadow: disabled ? "none" : "0 6px 16px -4px rgba(124,58,237,0.45)",
         ...style,
       }}
     >

@@ -2,13 +2,13 @@
 
 import { useMemo, useState } from "react";
 import type { UserData } from "@/lib/data";
-import type { Category, Tx, Goal, Widgets } from "@/lib/types";
+import type { Category, Tx, Goal, Widgets, Account } from "@/lib/types";
 import { buildUpcoming, buildMonthly } from "@/lib/derive";
 import { todayISO, currentMonthKey } from "@/lib/money";
 import { TabBar } from "@/components/TabBar";
 import { AddModal, type TxDraft } from "@/components/AddModal";
 import type { NavFn } from "@/components/screen-chrome";
-import { addTransaction, deleteTransaction, setWidget, depositGoal, logout } from "@/app/(app)/actions";
+import { addTransaction, deleteTransaction, setWidget, depositGoal, addAccount, transferBetweenAccounts, logout } from "@/app/(app)/actions";
 
 import { HomeScreen } from "@/components/screens/HomeScreen";
 import { TxScreen } from "@/components/screens/TxScreen";
@@ -34,6 +34,7 @@ export function AppShell({ data }: { data: UserData }) {
   const [txs, setTxs] = useState<Tx[]>(data.txs);
   const [goals, setGoals] = useState<Goal[]>(data.goals);
   const [widgets, setWidgets] = useState<Widgets>(data.widgets);
+  const [accounts, setAccounts] = useState<Account[]>(data.accounts);
 
   const catMap = useMemo(() => {
     const m: Record<string, Category> = {};
@@ -47,9 +48,9 @@ export function AppShell({ data }: { data: UserData }) {
 
   const accountShort = useMemo(() => {
     const m: Record<string, string> = {};
-    data.accounts.forEach((a) => (m[a.key] = a.short));
+    accounts.forEach((a) => (m[a.key] = a.short));
     return m;
-  }, [data.accounts]);
+  }, [accounts]);
 
   const upcoming = useMemo(
     () => buildUpcoming(data.cards, data.loans, data.installments, data.subscriptions, todayISO()),
@@ -92,6 +93,20 @@ export function AppShell({ data }: { data: UserData }) {
     setGoals((prev) => prev.map((g) => (g.key === key ? { ...g, saved } : g)));
   };
 
+  const onAddAccount = async (draft: Omit<Account, "key">) => {
+    const created = await addAccount(draft);
+    setAccounts((prev) => [...prev, created]);
+  };
+
+  const onTransfer = async (fromKey: string, toKey: string, amount: number) => {
+    const { fromBalance, toBalance, txOut, txIn } = await transferBetweenAccounts(fromKey, toKey, amount);
+    setAccounts((prev) => prev.map((a) =>
+      a.key === fromKey ? { ...a, balance: fromBalance } :
+      a.key === toKey   ? { ...a, balance: toBalance } : a
+    ));
+    setTxs((prev) => [txIn, txOut, ...prev]);
+  };
+
   let screen: React.ReactNode;
   switch (tab) {
     case "home":
@@ -99,7 +114,7 @@ export function AppShell({ data }: { data: UserData }) {
         <HomeScreen
           widgets={widgets}
           txs={txs}
-          accounts={data.accounts}
+          accounts={accounts}
           getCat={getCat}
           accountShort={accountShort}
           budgets={budgets}
@@ -143,7 +158,7 @@ export function AppShell({ data }: { data: UserData }) {
       screen = <CalendarScreen upcoming={upcoming} nav={nav} />;
       break;
     case "accounts":
-      screen = <AccountsScreen accounts={data.accounts} nav={nav} />;
+      screen = <AccountsScreen accounts={accounts} nav={nav} onAddAccount={onAddAccount} onTransfer={onTransfer} />;
       break;
     case "iou":
       screen = <IouScreen ious={data.ious} nav={nav} />;
@@ -171,7 +186,7 @@ export function AppShell({ data }: { data: UserData }) {
         onClose={() => setAdding(false)}
         onAdd={onAdd}
         categories={data.categories}
-        accounts={data.accounts}
+        accounts={accounts}
       />
     </>
   );
