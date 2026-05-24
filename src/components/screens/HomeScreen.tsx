@@ -42,6 +42,7 @@ export function HomeScreen({
   nav: NavFn;
 }) {
   const [hidden, setHidden] = useState(false);
+  const [showBills, setShowBills] = useState(false);
 
   const totalBalance = accounts.reduce((s, a) => s + a.balance, 0);
   const monthIncome = txs.filter((t) => t.amount > 0 && t.date.startsWith(monthKey)).reduce((s, t) => s + t.amount, 0);
@@ -62,10 +63,10 @@ export function HomeScreen({
           <div style={{ fontSize: 22, fontWeight: 800, color: THEME.text, letterSpacing: -0.4 }}>{displayName}</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button style={iconBtnStyle}>
+          <button style={iconBtnStyle} onClick={() => nav("tx")}>
             <Icon name="search" size={18} color={THEME.text} />
           </button>
-          <button style={iconBtnStyle}>
+          <button style={iconBtnStyle} onClick={() => setShowBills(true)}>
             <Icon name="bell" size={18} color={THEME.text} />
             <span
               style={{
@@ -322,6 +323,54 @@ export function HomeScreen({
             </Card>
           </div>
         </>
+      )}
+
+      {/* Upcoming bills popup */}
+      {showBills && (
+        <div
+          onClick={() => setShowBills(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 50,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex", alignItems: "flex-end",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%", maxWidth: 440, margin: "0 auto",
+              background: THEME.surface, borderRadius: "20px 20px 0 0",
+              padding: "20px 20px 40px",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: THEME.text }}>🔔 บิลที่กำลังจะถึง</div>
+              <button onClick={() => setShowBills(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: THEME.textSec }}>✕</button>
+            </div>
+            {upcoming.length === 0 ? (
+              <div style={{ textAlign: "center", color: THEME.textSec, padding: "20px 0" }}>ไม่มีบิลที่กำลังจะถึง</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {upcoming.map((b, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ fontSize: 20 }}>{b.icon}</div>
+                      <div>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: THEME.text }}>{b.label}</div>
+                        <div style={{ fontSize: 11.5, color: THEME.textSec }}>{billType(b.type)} · {b.dueDate}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: THEME.expense, fontFamily: MONO }}>{fmt(b.amount)}</div>
+                  </div>
+                ))}
+                <div style={{ borderTop: `1px solid ${THEME.border}`, paddingTop: 12, display: "flex", justifyContent: "space-between" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: THEME.text }}>รวมทั้งหมด</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: THEME.expense, fontFamily: MONO }}>{fmt(upcomingSum)}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Recent transactions */}
