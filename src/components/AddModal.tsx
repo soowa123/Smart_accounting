@@ -95,6 +95,14 @@ export function AddModal({
 
   const accentColor = kind === "income" ? THEME.income : THEME.expense;
 
+  // Fix Z: compute disabled state so button dims and gives visual feedback
+  const n = parseFloat(amount.replace(/,/g, "")) || 0;
+  const submitDisabled =
+    transferring ||
+    (kind === "transfer"
+      ? !(n > 0) || !account || !toAccount || account === toAccount
+      : !(n > 0) || !label.trim() || !catId || !account);
+
   return (
     <div
       style={{
@@ -301,7 +309,7 @@ export function AddModal({
         )}
 
         <div style={{ padding: "18px 20px 0" }}>
-          <PrimaryButton full onClick={submit} disabled={transferring}>
+          <PrimaryButton full onClick={submit} disabled={submitDisabled}>
             {transferring ? "กำลังโอน..." : kind === "transfer" ? "ยืนยันโอนเงิน" : "บันทึกรายการ"}
           </PrimaryButton>
         </div>

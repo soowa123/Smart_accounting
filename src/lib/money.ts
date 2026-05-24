@@ -24,9 +24,16 @@ export const TH_MONTHS = [
 
 export const thMonth = (monthIndex0: number): string => TH_MONTHS[((monthIndex0 % 12) + 12) % 12];
 
-// Current date helpers (real "today", replacing the prototype's hardcoded date).
-export const todayISO = (): string => new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-export const currentMonthKey = (): string => new Date().toISOString().slice(0, 7); // YYYY-MM
+// Current date helpers — use local time, NOT toISOString() (which is UTC and returns
+// "yesterday" for any hour before 07:00 in Thailand UTC+7).
+export const todayISO = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+export const currentMonthKey = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
 
 // Thai month label for a YYYY-MM-DD string, e.g. "5 มิ.ย."
 export const thDayMonth = (iso: string): string => {

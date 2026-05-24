@@ -24,7 +24,8 @@ export function AnalyticsScreen({
   // Expense breakdown by category (current month)
   const expenseByCat: Record<string, number> = {};
   txs
-    .filter((t) => t.amount < 0 && t.date.startsWith(monthKey))
+    // Fix P: exclude transfer transactions so they don't inflate the "other" category
+    .filter((t) => t.amount < 0 && t.date.startsWith(monthKey) && !t.tags.includes("transfer"))
     .forEach((t) => {
       const c = getCat(t.categoryKey);
       expenseByCat[c.key] = (expenseByCat[c.key] || 0) + Math.abs(t.amount);

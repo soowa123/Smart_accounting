@@ -32,11 +32,13 @@ export function buildUpcoming(
       bills.push({ date: c.dueDate, day: dayOf(c.dueDate), label: c.name, amount: c.fullPay, type: "card", icon: "💳", color: c.gradientFrom });
   });
   installments.forEach((i) => {
-    if (within(i.nextDue))
+    // Fix R: skip fully-paid installments (paid >= total)
+    if (i.paid < i.total && within(i.nextDue))
       bills.push({ date: i.nextDue, day: dayOf(i.nextDue), label: `${i.label} งวด ${i.paid + 1}`, amount: i.monthly, type: "inst", icon: i.icon, color: i.color });
   });
   loans.forEach((l) => {
-    if (within(l.nextDue))
+    // Fix R: skip fully-paid loans (remaining <= 0)
+    if (l.remaining > 0 && within(l.nextDue))
       bills.push({ date: l.nextDue, day: dayOf(l.nextDue), label: `${l.label} งวด ${l.paidTerms + 1}`, amount: l.monthly, type: "loan", icon: l.icon, color: l.color });
   });
 

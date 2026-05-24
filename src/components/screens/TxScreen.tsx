@@ -2,13 +2,24 @@
 
 import { useMemo, useState } from "react";
 import { THEME, MONO } from "@/lib/theme";
-import { fmt } from "@/lib/money";
+import { fmt, thMonth } from "@/lib/money";
 import { Icon } from "@/components/icons";
 import { Card, Segmented, TxRow } from "@/components/ui";
 import { ScreenHeader, iconBtnStyle, type NavFn } from "@/components/screen-chrome";
 import type { Category, Tx } from "@/lib/types";
 
 type Filter = "all" | "income" | "expense";
+
+// Fix Y: generate YYYY-MM strings for the last `count` months (newest first)
+function recentMonths(count = 6): string[] {
+  const result: string[] = [];
+  const d = new Date();
+  for (let i = 0; i < count; i++) {
+    result.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    d.setMonth(d.getMonth() - 1);
+  }
+  return result;
+}
 
 export function TxScreen({
   txs,
@@ -27,15 +38,21 @@ export function TxScreen({
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
+  const [filterMonth, setFilterMonth] = useState("");        // Fix Y: month filter
+  const [showMonthFilter, setShowMonthFilter] = useState(false); // Fix Y: toggle
+
+  const months = useMemo(() => recentMonths(6), []);
 
   const filtered = useMemo(() => {
     let list = txs;
-    if (filter === "income") list = list.filter((t) => t.amount > 0);
-    else if (filter === "expense") list = list.filter((t) => t.amount < 0);
+    // Fix S: exclude transfers from income/expense tabs
+    if (filter === "income") list = list.filter((t) => t.amount > 0 && !t.tags.includes("transfer"));
+    else if (filter === "expense") list = list.filter((t) => t.amount < 0 && !t.tags.includes("transfer"));
     const q = query.trim().toLowerCase();
     if (q) list = list.filter((t) => t.label.toLowerCase().includes(q) || getCat(t.categoryKey).label.includes(q));
+    if (filterMonth) list = list.filter((t) => t.date.startsWith(filterMonth)); // Fix Y
     return list;
-  }, [filter, query, txs, getCat]);
+  }, [filter, query, filterMonth, txs, getCat]);
 
   const grouped = useMemo(() => {
     const g: Record<string, Tx[]> = {};
@@ -55,8 +72,10 @@ export function TxScreen({
     return dt.toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short" });
   };
 
-  const income = filtered.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-  const expense = Math.abs(filtered.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0));
+  // Fix S: exclude transfers from income/expense summary cards
+  const nonTransfer = filtered.filter((t) => !t.tags.includes("transfer"));
+  const income = nonTransfer.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+  const expense = Math.abs(nonTransfer.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0));
 
   return (
     <div style={{ paddingBottom: 100 }}>
@@ -83,10 +102,58 @@ export function TxScreen({
             }}
           />
         </div>
-        <button style={{ ...iconBtnStyle, width: 38, height: 38 }}>
-          <Icon name="filter" size={16} color={THEME.text} />
+        {/* Fix Y: filter button now toggles month-filter chips */}
+        <button
+          onClick={() => setShowMonthFilter((v) => !v)}
+          style={{
+            ...iconBtnStyle,
+            width: 38,
+            height: 38,
+            background: showMonthFilter ? THEME.primary + "18" : undefined,
+            outline: showMonthFilter ? `2px solid ${THEME.primary}` : "none",
+          }}
+        >
+          <Icon name="filter" size={16} color={showMonthFilter ? THEME.primary : THEME.text} />
         </button>
       </div>
+
+      {/* Fix Y: month-filter chip row */}
+      {showMonthFilter && (
+        <div
+          className="no-scrollbar"
+          style={{ display: "flex", gap: 8, padding: "0 20px 12px", overflowX: "auto" }}
+        >
+          <button
+            onClick={() => setFilterMonth("")}
+            style={{
+              flexShrink: 0, padding: "6px 14px", borderRadius: 20, border: "none", cursor: "pointer",
+              background: filterMonth === "" ? THEME.primary : THEME.surface,
+              color: filterMonth === "" ? "#fff" : THEME.textSec,
+              fontSize: 12, fontWeight: 700,
+            }}
+          >
+            ทั้งหมด
+          </button>
+          {months.map((ym) => {
+            const [y, m] = ym.split("-");
+            const label = `${thMonth(parseInt(m, 10) - 1)} ${y}`;
+            return (
+              <button
+                key={ym}
+                onClick={() => setFilterMonth(ym === filterMonth ? "" : ym)}
+                style={{
+                  flexShrink: 0, padding: "6px 14px", borderRadius: 20, border: "none", cursor: "pointer",
+                  background: filterMonth === ym ? THEME.primary : THEME.surface,
+                  color: filterMonth === ym ? "#fff" : THEME.textSec,
+                  fontSize: 12, fontWeight: 700,
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <Segmented<Filter>
         value={filter}
@@ -115,14 +182,18 @@ export function TxScreen({
           .sort((a, b) => b.localeCompare(a))
           .map((date) => {
             const items = grouped[date];
-            const day = items.reduce((s, t) => s + t.amount, 0);
+            // Fix T: exclude transfers from per-day net (transfer pairs cancel each other anyway,
+            // but excluding keeps the number meaningful as real income/expense delta)
+            const day = items
+              .filter((t) => !t.tags.includes("transfer"))
+              .reduce((s, t) => s + t.amount, 0);
+            const dayColor = day < 0 ? THEME.expense : day > 0 ? THEME.income : THEME.textMuted;
             return (
               <div key={date} style={{ marginBottom: 14 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "8px 4px" }}>
                   <div style={{ fontSize: 12, color: THEME.textSec, fontWeight: 700 }}>{fmtDate(date)}</div>
-                  <div style={{ fontSize: 12, color: day < 0 ? THEME.expense : THEME.income, fontWeight: 700, fontFamily: MONO }}>
-                    {day > 0 ? "+" : ""}
-                    {fmt(day)}
+                  <div style={{ fontSize: 12, color: dayColor, fontWeight: 700, fontFamily: MONO }}>
+                    {day > 0 ? "+" : ""}{fmt(day)}
                   </div>
                 </div>
                 <Card padding={4}>

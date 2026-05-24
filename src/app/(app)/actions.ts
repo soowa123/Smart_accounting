@@ -59,7 +59,7 @@ export async function addTransaction(draft: {
   tags: string[];
 }): Promise<Tx> {
   const userId = await requireUserId();
-  const account = await prisma.account.findFirst({ where: { userId, key: draft.accountKey } });
+  // Fix W: use increment (atomic, no stale-read race condition)
   const created = await prisma.$transaction(async (dbTx) => {
     const newTx = await dbTx.transaction.create({
       data: {
@@ -73,12 +73,10 @@ export async function addTransaction(draft: {
         tags: JSON.stringify(draft.tags ?? []),
       },
     });
-    if (account) {
-      await dbTx.account.update({
-        where: { id: account.id },
-        data: { balance: account.balance + draft.amount },
-      });
-    }
+    await dbTx.account.updateMany({
+      where: { userId, key: draft.accountKey },
+      data: { balance: { increment: draft.amount } },
+    });
     return newTx;
   });
   return {
@@ -100,16 +98,13 @@ export async function deleteTransaction(id: string): Promise<void> {
   // Guard: system-generated transactions cannot be deleted
   const tags = parseTags(tx.tags);
   if (SYSTEM_TAGS.some((t) => tags.includes(t))) throw new Error("SYSTEM_TX");
-  const account = await prisma.account.findFirst({ where: { userId, key: tx.accountKey } });
+  // Fix W: atomic increment (no stale-read race condition, no account pre-fetch needed)
   await prisma.$transaction(async (dbTx) => {
     await dbTx.transaction.deleteMany({ where: { id, userId } });
-    if (account) {
-      // Reverse the original amount to restore balance
-      await dbTx.account.update({
-        where: { id: account.id },
-        data: { balance: account.balance - tx.amount },
-      });
-    }
+    await dbTx.account.updateMany({
+      where: { userId, key: tx.accountKey },
+      data: { balance: { increment: -tx.amount } },
+    });
   });
 }
 
@@ -148,8 +143,9 @@ export async function transferBetweenAccounts(
   const date = localISO(now); // Fix: was using toISOString() (UTC shift)
   const time = now.toTimeString().slice(0, 5);
   const result = await prisma.$transaction(async (dbTx) => {
-    const updFrom = await dbTx.account.update({ where: { id: from.id }, data: { balance: from.balance - amount } });
-    const updTo = await dbTx.account.update({ where: { id: to.id }, data: { balance: to.balance + amount } });
+    // Fix W: decrement/increment (atomic, no stale-read race condition)
+    const updFrom = await dbTx.account.update({ where: { id: from.id }, data: { balance: { decrement: amount } } });
+    const updTo = await dbTx.account.update({ where: { id: to.id }, data: { balance: { increment: amount } } });
     const out = await dbTx.transaction.create({ data: { userId, date, time, amount: -amount, categoryKey: "other", accountKey: fromKey, label: `โอนไป ${to.label}`, tags: '["transfer"]' } });
     const inp = await dbTx.transaction.create({ data: { userId, date, time, amount, categoryKey: "other", accountKey: toKey, label: `รับโอนจาก ${from.label}`, tags: '["transfer"]' } });
     return { fromBalance: updFrom.balance, toBalance: updTo.balance, out, inp };
@@ -236,7 +232,7 @@ export async function payCard(
         accountKey, label: `ชำระบัตร ${card.name}`, tags: '["card-payment"]',
       },
     }),
-    ...(account ? [prisma.account.update({ where: { id: account.id }, data: { balance: account.balance - payAmount } })] : []),
+    ...(account ? [prisma.account.update({ where: { id: account.id }, data: { balance: { decrement: payAmount } } })] : []),
   ]);
 
   return {
@@ -290,7 +286,7 @@ export async function payCardAmount(
         accountKey, label: `ชำระบัตร ${card.name}`, tags: '["card-payment"]',
       },
     }),
-    ...(account ? [prisma.account.update({ where: { id: account.id }, data: { balance: account.balance - payAmount } })] : []),
+    ...(account ? [prisma.account.update({ where: { id: account.id }, data: { balance: { decrement: payAmount } } })] : []),
   ]);
 
   return {
@@ -365,7 +361,7 @@ export async function recordLoanPayment(
         accountKey, label: `ผ่อน ${loan.label} งวด ${loan.paidTerms + 1}`, tags: '["loan-payment"]',
       },
     }),
-    ...(account ? [prisma.account.update({ where: { id: account.id }, data: { balance: account.balance - loan.monthly } })] : []),
+    ...(account ? [prisma.account.update({ where: { id: account.id }, data: { balance: { decrement: loan.monthly } } })] : []),
   ]);
 
   return {
@@ -421,7 +417,7 @@ export async function payLoanAmount(
         accountKey, label: `จ่ายพิเศษ ${loan.label}`, tags: '["loan-payment"]',
       },
     }),
-    ...(account ? [prisma.account.update({ where: { id: account.id }, data: { balance: account.balance - payAmount } })] : []),
+    ...(account ? [prisma.account.update({ where: { id: account.id }, data: { balance: { decrement: payAmount } } })] : []),
   ]);
 
   return {
@@ -492,7 +488,7 @@ export async function recordInstPayment(
         accountKey, label: `ผ่อน ${inst.label} งวด ${inst.paid + 1}`, tags: '["inst-payment"]',
       },
     }),
-    ...(account ? [prisma.account.update({ where: { id: account.id }, data: { balance: account.balance - inst.monthly } })] : []),
+    ...(account ? [prisma.account.update({ where: { id: account.id }, data: { balance: { decrement: inst.monthly } } })] : []),
   ]);
 
   return {
@@ -572,7 +568,7 @@ export async function paySubscription(
         accountKey, label: `จ่าย ${sub.label}`, tags: '["sub-payment"]',
       },
     }),
-    ...(account ? [prisma.account.update({ where: { id: account.id }, data: { balance: account.balance - sub.amount } })] : []),
+    ...(account ? [prisma.account.update({ where: { id: account.id }, data: { balance: { decrement: sub.amount } } })] : []),
   ]);
 
   return {
